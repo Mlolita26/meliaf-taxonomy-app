@@ -39,6 +39,7 @@ export default async function TermDetailPage({ params }: { params: { termId: str
     { key: 'exclude_if',    label: 'No adaptation link when', value: term.exclude_if },
     { key: 'cgiar_example', label: 'CGIAR Example',           value: term.cgiar_example },
     { key: 'related_terms', label: 'Related terms',           value: Array.isArray(term.related_terms) ? term.related_terms.join(', ') : term.related_terms },
+    { key: 'reference',     label: 'Links with term',         value: term.reference },
   ].filter(f => f.value);
 
   const backHref = term.level_1

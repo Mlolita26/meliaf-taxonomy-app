@@ -148,33 +148,66 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
     );
   }
 
-  // ── Default view: all terms flat (with search) ───────────────────────────
-  let query = supabase
+  // ── Default view: search results (flat) or all L1 categories by element ──
+  if (q) {
+    const { data: terms = [] } = await supabase
+      .from('taxonomy_terms')
+      .select('id, element, level_1, level_2, definition, is_active')
+      .eq('is_active', true)
+      .or(`level_2.ilike.%${q}%,definition.ilike.%${q}%,level_1.ilike.%${q}%`)
+      .order('element').order('level_1').order('level_2');
+
+    return (
+      <div className="p-4 space-y-4">
+        <div className="flex items-center justify-between pt-2">
+          <h1 className="text-xl font-bold text-gray-900">Browse Taxonomy</h1>
+          <Link href="/propose" className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors">
+            + Propose term
+          </Link>
+        </div>
+        <form method="GET" className="flex gap-2">
+          <input name="q" defaultValue={q} placeholder="Search terms…" className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+          <button type="submit" className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">Search</button>
+        </form>
+        <FilterRow active={undefined} q={q} />
+        <p className="text-sm text-gray-500">{(terms ?? []).length} results for "{q}"</p>
+        <div className="space-y-2">
+          {(terms ?? []).map((term: any) => {
+            const elementColor = ELEMENT_COLORS[term.element] ?? 'bg-gray-100 text-gray-700';
+            return (
+              <Link key={term.id} href={`/browse/${term.id}`} className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${elementColor}`}>{ELEMENT_LABELS[term.element] ?? term.element}</span>
+                  {term.level_1 && <span className="text-xs text-gray-400">{term.level_1}</span>}
+                </div>
+                <p className="font-medium text-gray-800">{term.level_2}</p>
+                {term.definition && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{term.definition}</p>}
+              </Link>
+            );
+          })}
+          {(terms ?? []).length === 0 && <div className="text-center py-12 text-gray-400"><p>No results found.</p></div>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default: all L1 categories grouped by element ────────────────────────
+  const { data: allTerms = [] } = await supabase
     .from('taxonomy_terms')
-    .select('id, term_code, element, level_1, level_2, definition, is_active')
-    .eq('is_active', true)
-    .order('element')
-    .order('level_1')
-    .order('level_2');
+    .select('element, level_1')
+    .eq('is_active', true);
 
-  if (q) query = query.or(`level_2.ilike.%${q}%,definition.ilike.%${q}%,level_1.ilike.%${q}%`);
-
-  const { data: terms = [] } = await query;
-
-  const termIds = (terms ?? []).map((t: any) => t.id);
-  const { data: reviewCounts } = await supabase
-    .from('review_assignments')
-    .select('term_id')
-    .in('term_id', termIds.length ? termIds : ['none'])
-    .neq('status', 'skipped');
-
-  const countMap: Record<string, number> = {};
-  (reviewCounts ?? []).forEach((r: any) => {
-    countMap[r.term_id] = (countMap[r.term_id] ?? 0) + 1;
+  // Build element → level1 → count map
+  const byElement: Record<string, Record<string, number>> = {};
+  (allTerms ?? []).forEach((t: any) => {
+    const el = t.element;
+    const l1 = t.level_1 ?? '(no category)';
+    if (!byElement[el]) byElement[el] = {};
+    byElement[el][l1] = (byElement[el][l1] ?? 0) + 1;
   });
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-6">
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-xl font-bold text-gray-900">Browse Taxonomy</h1>
         <Link href="/propose" className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors">
@@ -182,58 +215,42 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
         </Link>
       </div>
 
-      {/* Search */}
       <form method="GET" className="flex gap-2">
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="Search terms…"
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <input name="q" placeholder="Search terms…" className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
         <button type="submit" className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">Search</button>
       </form>
 
-      {/* Element filters */}
-      <FilterRow active={undefined} q={q} />
+      <FilterRow active={undefined} q={undefined} />
 
-      <p className="text-sm text-gray-500">{(terms ?? []).length} terms</p>
-
-      <div className="space-y-2">
-        {(terms ?? []).map((term: any) => {
-          const reviewCount = countMap[term.id] ?? 0;
-          const elementColor = ELEMENT_COLORS[term.element] ?? 'bg-gray-100 text-gray-700';
-          return (
-            <Link
-              key={term.id}
-              href={`/browse/${term.id}`}
-              className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
-            >
-              <div className="flex justify-between items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${elementColor}`}>
-                      {ELEMENT_LABELS[term.element] ?? term.element}
-                    </span>
-                    {term.level_1 && <span className="text-xs text-gray-400">{term.level_1}</span>}
+      {ELEMENT_ORDER.filter(el => byElement[el]).map(el => {
+        const level1List = Object.entries(byElement[el]).sort(([a], [b]) => a.localeCompare(b));
+        const elementColor = ELEMENT_COLORS[el] ?? 'bg-gray-100 text-gray-700';
+        const description = ELEMENT_DESCRIPTIONS[el];
+        return (
+          <div key={el} className="space-y-2">
+            <div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${elementColor}`}>{ELEMENT_LABELS[el] ?? el}</span>
+              <h2 className="text-base font-bold text-gray-900 mt-1">{ELEMENT_LABELS[el] ?? el}</h2>
+              {description && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>}
+            </div>
+            {level1List.map(([l1, count]) => (
+              <Link
+                key={l1}
+                href={`/browse?element=${el}&level1=${encodeURIComponent(l1)}`}
+                className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-gray-800">{l1}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 italic">Definition coming soon · {count} term{count !== 1 ? 's' : ''}</p>
                   </div>
-                  <p className="font-medium text-gray-800">{term.level_2}</p>
-                  {term.definition && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{term.definition}</p>
-                  )}
+                  <span className="text-gray-300 text-lg">›</span>
                 </div>
-                <div className="flex gap-1 flex-shrink-0 pt-1">
-                  {[0, 1].map(i => (
-                    <div key={i} className={`w-2.5 h-2.5 rounded-full ${i < reviewCount ? 'bg-green-500' : 'bg-gray-200'}`} />
-                  ))}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-        {(terms ?? []).length === 0 && (
-          <div className="text-center py-12 text-gray-400"><p>No terms found.</p></div>
-        )}
-      </div>
+              </Link>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: '/profile',     icon: '👤', label: 'Profile' },
 ];
 
-export function AppNav() {
+export function AppNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -32,6 +32,18 @@ export function AppNav() {
             </Link>
           );
         })}
+
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 text-xs transition-colors ${
+              pathname.startsWith('/admin') ? 'text-purple-600' : 'text-purple-400 hover:text-purple-600'
+            }`}
+          >
+            <span className="text-xl leading-none">⚙️</span>
+            <span className={pathname.startsWith('/admin') ? 'font-semibold' : ''}>Admin</span>
+          </Link>
+        )}
       </div>
     </nav>
   );

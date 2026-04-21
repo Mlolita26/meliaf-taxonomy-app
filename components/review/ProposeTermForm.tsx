@@ -17,6 +17,7 @@ const schema = z.object({
   exclude_if:    z.string().optional(),
   cgiar_example: z.string().optional(),
   related_terms: z.string().optional(),
+  reference:     z.string().optional(),
   rationale:     z.string().min(10, 'Explain why this term should be added'),
 });
 type FormData = z.infer<typeof schema>;
@@ -51,6 +52,7 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
       exclude_if:    data.exclude_if ?? null,
       cgiar_example: data.cgiar_example ?? null,
       related_terms: data.related_terms?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
+      reference:     data.reference ?? null,
     };
 
     const { error } = await supabase.from('suggestions').insert({
@@ -190,6 +192,16 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
           <input
             {...register('related_terms')}
             placeholder="e.g. drought stress, water deficit"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        {/* Links with term */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Links with term</label>
+          <input
+            {...register('reference')}
+            placeholder="Other terms or concepts this links to"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>

@@ -61,6 +61,7 @@ export const TERM_FIELDS = [
   { key: 'exclude_if',    label: 'No adaptation link when' },
   { key: 'cgiar_example', label: 'CGIAR Example' },
   { key: 'related_terms', label: 'Related terms' },
+  { key: 'reference',     label: 'Links with term' },
 ] as const;
 
 export type TermFieldKey = typeof TERM_FIELDS[number]['key'];

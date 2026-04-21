@@ -8,12 +8,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user) redirect('/');
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 max-w-2xl mx-auto w-full pb-20">
         {children}
       </div>
-      <AppNav />
+      <AppNav isAdmin={profile?.is_admin ?? false} />
     </div>
   );
 }
