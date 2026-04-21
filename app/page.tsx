@@ -9,23 +9,21 @@ export default function LandingPage() {
             <span className="text-3xl">🌿</span>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">MELIAF Taxonomy</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Climate Adaptation Taxonomy</h1>
             <p className="text-green-700 font-medium mt-1">Review &amp; Enrich</p>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-gray-600 text-lg leading-relaxed">
-            Help shape the CGIAR climate adaptation taxonomy. Review terms, suggest improvements, and earn points.
+        <div className="space-y-3">
+          <p className="text-gray-600 text-base leading-relaxed">
+            CGIAR works on climate adaptation across multiple programs and projects but defines and measures it differently in each. The result is a fragmented story no funder or policymaker can act on. This taxonomy fixes that. Your review makes it scientifically sound.
           </p>
-          <p className="text-sm text-gray-400">96 terms · 8 elements · 2 reviewers per term</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-gray-100">
+        <div className="grid grid-cols-2 gap-4 py-4 border-t border-b border-gray-100">
           {[
             { label: 'Terms', value: '96' },
-            { label: 'Fields', value: '12' },
-            { label: 'Max reviewers', value: '2' },
+            { label: 'Elements', value: '8' },
           ].map((s) => (
             <div key={s.label} className="text-center">
               <div className="text-2xl font-bold text-green-700">{s.value}</div>
@@ -50,7 +48,7 @@ export default function LandingPage() {
         </div>
 
         <p className="text-xs text-gray-400">
-          A CGIAR research initiative · Alliance of Bioversity International &amp; CIAT
+          Powered by the Climate Adaptation Accelerator (CGIAR MELIAF Project)
         </p>
       </div>
     </main>

@@ -10,6 +10,18 @@ export const POINTS = {
   ALL_ASSIGNED_BONUS:       25,
 } as const;
 
+// Ordered list for filter buttons (All is appended at end in the UI)
+export const ELEMENT_ORDER = [
+  'Rationale',
+  'Intervention',
+  'Outcome_process',
+  'Outcome_early',
+  'Outcome_intermediate',
+  'Outcome',
+  'Impact',
+  'Beneficiary',
+];
+
 export const ELEMENT_LABELS: Record<string, string> = {
   Rationale:            'Rationale',
   Intervention:         'Intervention',
@@ -32,17 +44,23 @@ export const ELEMENT_COLORS: Record<string, string> = {
   Beneficiary:          'bg-pink-100 text-pink-800',
 };
 
+export const ELEMENT_DESCRIPTIONS: Record<string, string> = {
+  Rationale:            'The climate problem or opportunity that makes adaptation necessary or desirable for a given population or system. Captures why action is needed: the specific hazard, exposure condition, or capacity gap.',
+  Intervention:         'The investment area through which CGIAR contributes to addressing the adaptation rationale. Captures what is done: the policy, practice, technology, service, or institutional change delivered or enabled.',
+  Outcome_process:      'A tangible product or service produced by an intervention. Captures what was delivered: assessments completed, plans developed, tools created, systems established.',
+  Outcome_early:        'A first-order change in the reach or awareness of target groups. Captures who was reached and what they know or can now access. Does not yet imply behavior change.',
+  Outcome_intermediate: 'A change in behavior, practice, or policy by target groups following exposure to an output or short-term outcome. Captures what people or institutions started doing differently.',
+  Outcome:              'A measurable change in the state of a system — production system, institution, or landscape — resulting from sustained behavior or policy change.',
+  Impact:               'A welfare consequence experienced by people as a result of system-level change. Captures what it meant for human wellbeing: income losses avoided, food security maintained, displacement prevented.',
+  Beneficiary:          'The person, group, or institution that experiences outcomes or impacts from CGIAR adaptation work. Captures for whom the adaptation chain operates.',
+};
+
 export const TERM_FIELDS = [
+  { key: 'level_2',       label: 'Term name' },
   { key: 'definition',    label: 'Definition' },
-  { key: 'include_if',    label: 'Include if' },
-  { key: 'exclude_if',    label: 'Exclude if' },
+  { key: 'exclude_if',    label: 'No adaptation link when' },
   { key: 'cgiar_example', label: 'CGIAR Example' },
-  { key: 'related_terms', label: 'Related Terms' },
-  { key: 'reference',     label: 'Reference' },
-  { key: 'notes',         label: 'Notes' },
-  { key: 'level_1',       label: 'Level 1' },
-  { key: 'level_2',       label: 'Level 2' },
-  { key: 'level_3',       label: 'Level 3' },
+  { key: 'related_terms', label: 'Related terms' },
 ] as const;
 
 export type TermFieldKey = typeof TERM_FIELDS[number]['key'];

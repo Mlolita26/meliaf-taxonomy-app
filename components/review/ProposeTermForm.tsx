@@ -6,21 +6,17 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createClient } from '@/lib/supabase/client';
-import { ELEMENT_LABELS } from '@/constants/points';
+import { ELEMENT_LABELS, ELEMENT_ORDER } from '@/constants/points';
 import type { TaxonomyElement } from '@/types/database';
 
 const schema = z.object({
   element:       z.string().min(1, 'Select an element'),
   level_1:       z.string().min(1, 'Required'),
   level_2:       z.string().min(1, 'Required'),
-  level_3:       z.string().optional(),
   definition:    z.string().min(20, 'Please write a definition (at least 20 characters)'),
-  include_if:    z.string().optional(),
   exclude_if:    z.string().optional(),
   cgiar_example: z.string().optional(),
   related_terms: z.string().optional(),
-  reference:     z.string().optional(),
-  notes:         z.string().optional(),
   rationale:     z.string().min(10, 'Explain why this term should be added'),
 });
 type FormData = z.infer<typeof schema>;
@@ -51,14 +47,10 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
       element:       data.element,
       level_1:       data.level_1,
       level_2:       data.level_2,
-      level_3:       data.level_3 ?? null,
       definition:    data.definition,
-      include_if:    data.include_if ?? null,
       exclude_if:    data.exclude_if ?? null,
       cgiar_example: data.cgiar_example ?? null,
       related_terms: data.related_terms?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
-      reference:     data.reference ?? null,
-      notes:         data.notes ?? null,
     };
 
     const { error } = await supabase.from('suggestions').insert({
@@ -108,6 +100,12 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
         </div>
       </div>
 
+      {/* Level explanation */}
+      <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700 space-y-1">
+        <p><span className="font-semibold">Level 1</span> = high-level category (e.g. Climate risk reduction). Groups related terms together.</p>
+        <p><span className="font-semibold">Level 2</span> = the actual term being proposed (e.g. Drought stress).</p>
+      </div>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Element */}
         <div>
@@ -117,8 +115,8 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
             <option value="">Select element…</option>
-            {Object.entries(ELEMENT_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+            {ELEMENT_ORDER.map(k => (
+              <option key={k} value={k}>{ELEMENT_LABELS[k]}</option>
             ))}
           </select>
           {errors.element && <p className="text-red-500 text-xs mt-1">{errors.element.message}</p>}
@@ -126,11 +124,11 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
 
         {/* Level 1 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Level 1 *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Level 1 — Category *</label>
           <input
             {...register('level_1')}
             list="level1-options"
-            placeholder="Category (or select existing)"
+            placeholder="Select or type a category"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <datalist id="level1-options">
@@ -141,25 +139,13 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
 
         {/* Level 2 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Level 2 (term name) *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Level 2 — Term name *</label>
           <input
             {...register('level_2')}
-            placeholder="Specific term name"
+            placeholder="The specific term you are proposing"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {errors.level_2 && <p className="text-red-500 text-xs mt-1">{errors.level_2.message}</p>}
-        </div>
-
-        {/* Level 3 (optional) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Level 3 <span className="text-gray-400 font-normal">(optional)</span>
-          </label>
-          <input
-            {...register('level_3')}
-            placeholder="Sub-category (coming soon)"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
         </div>
 
         {/* Definition */}
@@ -174,38 +160,38 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
           {errors.definition && <p className="text-red-500 text-xs mt-1">{errors.definition.message}</p>}
         </div>
 
-        {/* Include / Exclude */}
+        {/* No adaptation link when */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Include if</label>
-          <textarea {...register('include_if')} rows={2} placeholder="When should this term be used?" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Exclude if</label>
-          <textarea {...register('exclude_if')} rows={2} placeholder="When should this term NOT be used?" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">No adaptation link when</label>
+          <textarea
+            {...register('exclude_if')}
+            rows={2}
+            placeholder="When should this term NOT be used?"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+          />
         </div>
 
         {/* CGIAR Example */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">CGIAR Example</label>
-          <textarea {...register('cgiar_example')} rows={2} placeholder="Real example from CGIAR portfolio…" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+          <textarea
+            {...register('cgiar_example')}
+            rows={2}
+            placeholder="Real example from CGIAR portfolio…"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+          />
         </div>
 
         {/* Related terms */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Related terms <span className="text-gray-400 font-normal">(comma-separated)</span></label>
-          <input {...register('related_terms')} placeholder="e.g. drought stress, water deficit" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        </div>
-
-        {/* Reference */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
-          <input {...register('reference')} placeholder="e.g. IPCC AR6 WGII Ch.5" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-          <textarea {...register('notes')} rows={2} placeholder="Any additional notes…" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Related terms <span className="text-gray-400 font-normal">(comma-separated)</span>
+          </label>
+          <input
+            {...register('related_terms')}
+            placeholder="e.g. drought stress, water deficit"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
 
         {/* Rationale */}

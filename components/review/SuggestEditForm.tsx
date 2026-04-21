@@ -9,7 +9,6 @@ import { createClient } from '@/lib/supabase/client';
 import type { TaxonomyTerm } from '@/types/database';
 import { TERM_FIELDS, ELEMENT_LABELS } from '@/constants/points';
 
-// confidence managed as local state (range input returns string; keep form simple)
 const schema = z.object({
   field_name:      z.string().min(1, 'Select a field'),
   proposed_value:  z.string().min(10, 'Please provide at least 10 characters'),
@@ -104,7 +103,7 @@ export function SuggestEditForm({ term, userId, preSelectedField, assignmentId }
         <div>
           <h1 className="text-lg font-bold text-gray-900">Suggest an edit</h1>
           <p className="text-sm text-gray-500">
-            {term.term_code} · {ELEMENT_LABELS[term.element] ?? term.element}
+            {term.level_2} · {ELEMENT_LABELS[term.element] ?? term.element}
           </p>
         </div>
       </div>
@@ -135,9 +134,9 @@ export function SuggestEditForm({ term, userId, preSelectedField, assignmentId }
           </div>
         )}
 
-        {/* Proposed value */}
+        {/* Proposed change */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Proposed value</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Proposed change</label>
           <textarea
             {...register('proposed_value')}
             rows={4}
@@ -147,31 +146,25 @@ export function SuggestEditForm({ term, userId, preSelectedField, assignmentId }
           {errors.proposed_value && <p className="text-red-500 text-xs mt-1">{errors.proposed_value.message}</p>}
         </div>
 
-        {/* Confidence slider (uncontrolled range → local state) */}
+        {/* Confidence */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Confidence: {'⭐'.repeat(confidence)}
           </label>
           <input
-            type="range"
-            min={1} max={5} step={1}
+            type="range" min={1} max={5} step={1}
             value={confidence}
             onChange={e => setConfidence(Number(e.target.value))}
             className="w-full accent-green-600"
           />
           <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>Unsure</span>
-            <span>Very confident</span>
+            <span>Unsure</span><span>Very confident</span>
           </div>
         </div>
 
-        {/* Major change toggle */}
+        {/* Major change */}
         <label className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl cursor-pointer">
-          <input
-            type="checkbox"
-            {...register('is_major_change')}
-            className="w-4 h-4 accent-amber-600"
-          />
+          <input type="checkbox" {...register('is_major_change')} className="w-4 h-4 accent-amber-600" />
           <div>
             <p className="text-sm font-medium text-gray-800">This is a major restructuring</p>
             <p className="text-xs text-gray-500">Check if this changes meaning, scope, or hierarchy significantly</p>
