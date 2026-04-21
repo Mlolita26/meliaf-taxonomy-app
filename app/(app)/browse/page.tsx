@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { ELEMENT_LABELS, ELEMENT_COLORS, ELEMENT_DESCRIPTIONS, ELEMENT_ORDER } from '@/constants/points';
+import { ELEMENT_LABELS, ELEMENT_COLORS, ELEMENT_FILTER_COLORS, ELEMENT_DESCRIPTIONS, ELEMENT_ORDER } from '@/constants/points';
 
 interface SearchParams { element?: string; level1?: string; q?: string }
 
@@ -259,19 +259,20 @@ function FilterRow({ active, q }: { active?: string; q?: string }) {
   const qParam = q ? `&q=${q}` : '';
   return (
     <div className="flex flex-wrap gap-2">
-      {ELEMENT_ORDER.map(el => (
-        <Link
-          key={el}
-          href={`/browse?element=${el}${qParam}`}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-            active === el
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-          }`}
-        >
-          {ELEMENT_LABELS[el]}
-        </Link>
-      ))}
+      {ELEMENT_ORDER.map(el => {
+        const colors = ELEMENT_FILTER_COLORS[el];
+        return (
+          <Link
+            key={el}
+            href={`/browse?element=${el}${qParam}`}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              active === el ? colors.active : colors.inactive
+            }`}
+          >
+            {ELEMENT_LABELS[el]}
+          </Link>
+        );
+      })}
       <Link
         href={q ? `/browse?q=${q}` : '/browse'}
         className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${

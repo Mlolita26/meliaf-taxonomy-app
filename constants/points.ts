@@ -44,6 +44,17 @@ export const ELEMENT_COLORS: Record<string, string> = {
   Beneficiary:          'bg-pink-100 text-pink-800',
 };
 
+export const ELEMENT_FILTER_COLORS: Record<string, { inactive: string; active: string }> = {
+  Rationale:            { inactive: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200',   active: 'bg-orange-500 text-white border-orange-500' },
+  Intervention:         { inactive: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',           active: 'bg-blue-500 text-white border-blue-500' },
+  Outcome_process:      { inactive: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',   active: 'bg-purple-500 text-white border-purple-500' },
+  Outcome_early:        { inactive: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',           active: 'bg-teal-500 text-white border-teal-500' },
+  Outcome_intermediate: { inactive: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200',           active: 'bg-cyan-500 text-white border-cyan-500' },
+  Outcome:              { inactive: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',       active: 'bg-green-500 text-white border-green-500' },
+  Impact:               { inactive: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200', active: 'bg-emerald-500 text-white border-emerald-500' },
+  Beneficiary:          { inactive: 'bg-pink-100 text-pink-800 border-pink-200 hover:bg-pink-200',           active: 'bg-pink-500 text-white border-pink-500' },
+};
+
 export const ELEMENT_DESCRIPTIONS: Record<string, string> = {
   Rationale:            'The climate problem or opportunity that makes adaptation necessary or desirable for a given population or system. Captures why action is needed: the specific hazard, exposure condition, or capacity gap.',
   Intervention:         'The investment area through which CGIAR contributes to addressing the adaptation rationale. Captures what is done: the policy, practice, technology, service, or institutional change delivered or enabled.',
