@@ -45,14 +45,14 @@ export const ELEMENT_COLORS: Record<string, string> = {
 };
 
 export const ELEMENT_FILTER_COLORS: Record<string, { inactive: string; active: string }> = {
-  Rationale:            { inactive: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200',   active: 'bg-orange-500 text-white border-orange-500' },
-  Intervention:         { inactive: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',           active: 'bg-blue-500 text-white border-blue-500' },
-  Outcome_process:      { inactive: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',   active: 'bg-purple-500 text-white border-purple-500' },
-  Outcome_early:        { inactive: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',           active: 'bg-teal-500 text-white border-teal-500' },
-  Outcome_intermediate: { inactive: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200',           active: 'bg-cyan-500 text-white border-cyan-500' },
-  Outcome:              { inactive: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',       active: 'bg-green-500 text-white border-green-500' },
-  Impact:               { inactive: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200', active: 'bg-emerald-500 text-white border-emerald-500' },
-  Beneficiary:          { inactive: 'bg-pink-100 text-pink-800 border-pink-200 hover:bg-pink-200',           active: 'bg-pink-500 text-white border-pink-500' },
+  Rationale:            { inactive: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200',     active: 'bg-orange-300 text-orange-900 border-orange-500 font-semibold' },
+  Intervention:         { inactive: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',             active: 'bg-blue-300 text-blue-900 border-blue-500 font-semibold' },
+  Outcome_process:      { inactive: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',     active: 'bg-purple-300 text-purple-900 border-purple-500 font-semibold' },
+  Outcome_early:        { inactive: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',             active: 'bg-teal-300 text-teal-900 border-teal-500 font-semibold' },
+  Outcome_intermediate: { inactive: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200',             active: 'bg-cyan-300 text-cyan-900 border-cyan-500 font-semibold' },
+  Outcome:              { inactive: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',         active: 'bg-green-300 text-green-900 border-green-500 font-semibold' },
+  Impact:               { inactive: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200', active: 'bg-emerald-300 text-emerald-900 border-emerald-500 font-semibold' },
+  Beneficiary:          { inactive: 'bg-pink-100 text-pink-800 border-pink-200 hover:bg-pink-200',             active: 'bg-pink-300 text-pink-900 border-pink-500 font-semibold' },
 };
 
 export const ELEMENT_DESCRIPTIONS: Record<string, string> = {
