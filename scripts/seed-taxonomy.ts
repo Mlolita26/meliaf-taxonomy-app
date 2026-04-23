@@ -1,7 +1,10 @@
 /**
- * One-time seed script: reads AdaptationTaxonomy.xlsx and upserts all terms into Supabase.
- * Run: npx ts-node --esm scripts/seed-taxonomy.ts
- * Requires: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local
+ * Seed script: reads AdaptationTaxonomy.xlsx (Human-readable-app sheet) and upserts all terms.
+ * L1 rows are inserted with level_2 = null so the browse page can display their definitions.
+ * L2 rows carry their L1 parent name looked up from the same sheet via "Child of" reference.
+ *
+ * Run: npx tsx scripts/seed-taxonomy.ts
+ * Requires: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 import { createRequire } from 'module';
 import { createClient } from '@supabase/supabase-js';
@@ -24,36 +27,29 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-// Path to the taxonomy Excel file — adjust if needed
 const TAXONOMY_PATH = path.resolve(
   process.env.TAXONOMY_PATH ||
   "C:/Users/mlolita/OneDrive - CGIAR/Nowak, Andreea (Alliance Bioversity-CIAT)'s files - MELIAF-Implementation/_Taxonomy/AdaptationTaxonomy.xlsx"
 );
 
-const ELEMENT_MAP: Record<string, string> = {
-  'Rationale':             'Rationale',
-  'Intervention':          'Intervention',
-  'Outcome_process':       'Outcome_process',
-  'Outcome_early':         'Outcome_early',
-  'Outcome_intermediate':  'Outcome_intermediate',
-  'Outcome':               'Outcome',
-  'Impact':                'Impact',
-  'Beneficiary':           'Beneficiary',
-};
+// Human-readable-app sheet columns (0-based index):
+// 0=Id, 1=Element, 2=Level, 3=Name, 4=Definition, 5=k (exclude_if / no adaptation link when)
+// 6=Related terms, 7=CGIAR example, 8=Parent of, 9=Child of, 10=Links with, 11=Reference, 12=Notes
 
 interface RawRow {
-  Id?: string;
-  Element?: string;
-  'Level 1'?: string;
-  'Level 2'?: string;
-  'Level 3'?: string;
-  Definition?: string;
-  'Include if'?: string;
-  'Exclude if'?: string;
-  'CGIAR example'?: string;
+  Id?:            string;
+  Element?:       string;
+  Level?:         string;
+  Name?:          string;
+  Definition?:    string;
+  k?:             string;   // "No adaptation link when" (exclude_if)
   'Related terms'?: string;
-  Reference?: string;
-  Notes?: string;
+  'CGIAR example'?: string;
+  'Parent of'?:   string;
+  'Child of'?:    string;
+  'Links with'?:  string;
+  Reference?:     string;
+  Notes?:         string;
 }
 
 function parseRelatedTerms(raw: string | undefined): string[] {
@@ -64,13 +60,12 @@ function parseRelatedTerms(raw: string | undefined): string[] {
 async function main() {
   if (!fs.existsSync(TAXONOMY_PATH)) {
     console.error(`Taxonomy file not found: ${TAXONOMY_PATH}`);
-    console.error('Set TAXONOMY_PATH env var to override.');
     process.exit(1);
   }
 
   console.log(`Reading: ${TAXONOMY_PATH}`);
   const workbook  = XLSX.readFile(TAXONOMY_PATH);
-  const sheetName = 'Human-readable';
+  const sheetName = 'Human-readable-app';
 
   if (!workbook.Sheets[sheetName]) {
     console.error(`Sheet "${sheetName}" not found. Available:`, workbook.SheetNames);
@@ -81,24 +76,70 @@ async function main() {
     defval: undefined,
   }) as RawRow[];
 
-  const terms = rows
-    .filter((r: RawRow) => r.Id && r.Element)
-    .map((r: RawRow) => ({
-      term_code:     String(r.Id!).trim(),
-      element:       ELEMENT_MAP[String(r.Element!).trim()] ?? String(r.Element!).trim(),
-      level_1:       r['Level 1']     ? String(r['Level 1']).trim()     : null,
-      level_2:       r['Level 2']     ? String(r['Level 2']).trim()     : null,
-      level_3:       r['Level 3']     ? String(r['Level 3']).trim()     : null,
-      definition:    r.Definition     ? String(r.Definition).trim()     : null,
-      include_if:    r['Include if']  ? String(r['Include if']).trim()  : null,
-      exclude_if:    r['Exclude if']  ? String(r['Exclude if']).trim()  : null,
-      cgiar_example: r['CGIAR example']? String(r['CGIAR example']).trim(): null,
-      related_terms: parseRelatedTerms(r['Related terms']),
-      reference:     r.Reference      ? String(r.Reference).trim()      : null,
-      notes:         r.Notes          ? String(r.Notes).trim()          : null,
-    }));
+  // First pass: build a map from term ID → L1 name (for L2 rows to look up their parent)
+  const idToL1Name: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.Id && r.Level === 'Level 1' && r.Name) {
+      idToL1Name[String(r.Id).trim()] = String(r.Name).trim();
+    }
+  }
 
-  console.log(`Parsed ${terms.length} terms. Upserting...`);
+  const terms: any[] = [];
+
+  for (const r of rows) {
+    if (!r.Id || !r.Element || !r.Level || !r.Name) continue;
+
+    const termCode = String(r.Id).trim();
+    const element  = String(r.Element).trim();
+    const level    = String(r.Level).trim();
+    const name     = String(r.Name).trim();
+
+    if (level === 'Level 1') {
+      // L1 row: level_2 = null, level_1 = Name
+      terms.push({
+        term_code:     termCode,
+        element,
+        level_1:       name,
+        level_2:       null,
+        level_3:       null,
+        definition:    r.Definition     ? String(r.Definition).trim()     : null,
+        exclude_if:    r.k              ? String(r.k).trim()              : null,
+        cgiar_example: r['CGIAR example'] ? String(r['CGIAR example']).trim() : null,
+        related_terms: parseRelatedTerms(r['Related terms']),
+        reference:     r['Links with']  ? String(r['Links with']).trim()  : null,
+        notes:         r.Notes          ? String(r.Notes).trim()          : null,
+        include_if:    null,
+        is_active:     true,
+        is_proposed:   false,
+      });
+    } else if (level === 'Level 2') {
+      // L2 row: level_2 = Name, derive level_1 from "Child of" reference
+      const parentId = r['Child of'] ? String(r['Child of']).trim() : null;
+      const level1   = parentId ? (idToL1Name[parentId] ?? null) : null;
+
+      terms.push({
+        term_code:     termCode,
+        element,
+        level_1:       level1,
+        level_2:       name,
+        level_3:       null,
+        definition:    r.Definition     ? String(r.Definition).trim()     : null,
+        exclude_if:    r.k              ? String(r.k).trim()              : null,
+        cgiar_example: r['CGIAR example'] ? String(r['CGIAR example']).trim() : null,
+        related_terms: parseRelatedTerms(r['Related terms']),
+        reference:     r['Links with']  ? String(r['Links with']).trim()  : null,
+        notes:         r.Notes          ? String(r.Notes).trim()          : null,
+        include_if:    null,
+        is_active:     true,
+        is_proposed:   false,
+      });
+    }
+    // Skip any other levels
+  }
+
+  const l1Count = terms.filter(t => t.level_2 === null).length;
+  const l2Count = terms.filter(t => t.level_2 !== null).length;
+  console.log(`Parsed ${terms.length} rows (${l1Count} L1 categories + ${l2Count} L2 terms). Upserting…`);
 
   const { error } = await supabase
     .from('taxonomy_terms')
@@ -109,13 +150,11 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`✓ Successfully seeded ${terms.length} terms.`);
-
-  // Verify
   const { count } = await supabase
     .from('taxonomy_terms')
     .select('*', { count: 'exact', head: true });
-  console.log(`Total terms in DB: ${count}`);
+
+  console.log(`✓ Done. Total terms in DB: ${count}`);
 }
 
 main().catch(console.error);

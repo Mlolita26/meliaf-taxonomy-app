@@ -1,81 +1,95 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+
+type Status = 'checking' | 'available' | 'saving' | 'done';
 
 export default function AgreeButton({ termId, termCode, userId }: { termId: string; termCode: string; userId: string }) {
-  const [done, setDone]         = useState(false);
-  const [loading, setLoading]   = useState(false);
+  const [status, setStatus]       = useState<Status>('checking');
   const [showToast, setShowToast] = useState(false);
   const supabase = createClient();
 
+  useEffect(() => {
+    supabase
+      .from('points_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('source_type', 'term_approved')
+      .eq('source_id', termId)
+      .then(({ count }) => setStatus((count ?? 0) > 0 ? 'done' : 'available'));
+  }, [userId, termId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleAgree() {
-    setLoading(true);
+    if (status !== 'available') return;
+    setStatus('saving');
 
-    const [{ error: txError }] = await Promise.all([
-      supabase.from('points_transactions').insert({
-        user_id:     userId,
-        points:      10,
-        reason:      `Agreed with term: ${termCode}`,
-        source_type: 'term_approved',
-      }),
-      // Also increment profile directly so the profile page shows updated points
-      // even if the DB trigger is delayed
-      supabase.from('profiles').select('total_points').eq('id', userId).single()
-        .then(({ data }) =>
-          supabase.from('profiles')
-            .update({ total_points: (data?.total_points ?? 0) + 10 })
-            .eq('id', userId)
-        ),
-    ]);
+    const { error } = await supabase.from('points_transactions').insert({
+      user_id:     userId,
+      points:      10,
+      reason:      `Agreed with term: ${termCode}`,
+      source_type: 'term_approved',
+      source_id:   termId,
+    });
 
-    if (!txError) {
+    if (!error) {
+      // Bump profile total directly for instant visibility
+      const { data: profile } = await supabase
+        .from('profiles').select('total_points').eq('id', userId).single();
+      await supabase.from('profiles')
+        .update({ total_points: (profile?.total_points ?? 0) + 10 })
+        .eq('id', userId);
+
       setShowToast(true);
-      setTimeout(() => {
-        setShowToast(false);
-        setDone(true);
-      }, 1400);
+      setTimeout(() => { setShowToast(false); setStatus('done'); }, 2200);
+    } else {
+      setStatus('available');
     }
-    setLoading(false);
-  }
-
-  if (done) {
-    return (
-      <div className="w-full py-2.5 text-center bg-gray-50 text-green-700 font-medium rounded-xl text-sm border border-green-100">
-        ✓ Agreed · +10 pts
-      </div>
-    );
   }
 
   return (
-    <div className="relative">
-      {/* Floating +10 pts toast */}
-      {showToast && (
-        <div
-          className="absolute inset-x-0 -top-8 flex justify-center pointer-events-none"
-          style={{ animation: 'floatUp 1.4s ease-out forwards' }}
-        >
-          <span className="bg-green-600 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md">
-            +10 pts 🎉
-          </span>
+    <>
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: 30 }}
+            animate={{ opacity: 1, scale: 1,   y: 0  }}
+            exit={{   opacity: 0, scale: 0.8,  y: -50 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+          >
+            <div className="bg-green-600 text-white px-10 py-6 rounded-3xl shadow-2xl text-center">
+              <div className="text-4xl font-black">+10 pts</div>
+              <div className="text-3xl mt-1">🎉</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {status === 'checking' && (
+        <div className="w-full py-2.5 text-center bg-gray-50 text-gray-400 rounded-xl text-sm border border-gray-100 animate-pulse">
+          Loading…
         </div>
       )}
-
-      <button
-        onClick={handleAgree}
-        disabled={loading || showToast}
-        className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
-      >
-        {loading ? 'Saving…' : 'I agree with this term  +10 pts'}
-      </button>
-
-      <style jsx>{`
-        @keyframes floatUp {
-          0%   { opacity: 1; transform: translateY(0) scale(1); }
-          60%  { opacity: 1; transform: translateY(-18px) scale(1.1); }
-          100% { opacity: 0; transform: translateY(-32px) scale(0.95); }
-        }
-      `}</style>
-    </div>
+      {status === 'available' && (
+        <button
+          onClick={handleAgree}
+          className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 active:scale-95 transition-all text-sm"
+        >
+          I agree with this term · +10 pts
+        </button>
+      )}
+      {status === 'saving' && (
+        <div className="w-full py-2.5 text-center bg-gray-50 text-gray-400 rounded-xl text-sm border border-gray-100 animate-pulse">
+          Saving…
+        </div>
+      )}
+      {status === 'done' && (
+        <div className="w-full py-2.5 text-center bg-green-50 text-green-700 font-medium rounded-xl text-sm border border-green-100">
+          ✓ Agreed · +10 pts
+        </div>
+      )}
+    </>
   );
 }

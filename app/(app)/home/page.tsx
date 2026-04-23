@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -10,53 +12,49 @@ export default async function HomePage() {
 
   const [
     { data: profile },
-    { data: assignments },
-    { data: rank },
     { count: totalTerms },
-    { count: coveredTerms },
+    { count: totalUsers },
+    { count: totalAgreements },
+    { count: totalSuggestions },
+    { count: acceptedSuggestions },
+    { count: newTermsProposed },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase
-      .from('review_assignments')
-      .select('*, taxonomy_terms(term_code, element, level_2)')
-      .eq('reviewer_id', user.id)
-      .in('status', ['pending', 'in_progress'])
-      .order('due_date', { ascending: true })
-      .limit(5),
-    supabase
-      .from('leaderboard')
-      .select('rank, total_points')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('taxonomy_terms')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-      .eq('is_proposed', false),
-    supabase.rpc('count_covered_terms' as never),
+    supabase.from('taxonomy_terms').select('*', { count: 'exact', head: true }).eq('is_active', true).eq('is_proposed', false),
+    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_admin', false),
+    supabase.from('points_transactions').select('*', { count: 'exact', head: true }).eq('source_type', 'term_approved'),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'accepted'),
+    supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('suggestion_type', 'new_term'),
   ]);
 
-  // Fallback for covered terms count
-  const { count: covered2 } = await supabase
-    .from('review_assignments')
-    .select('term_id', { count: 'exact', head: true })
-    .eq('status', 'completed');
+  // Rank = how many non-admin users have strictly more points, + 1
+  const { count: aboveMe } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .gt('total_points', profile?.total_points ?? 0)
+    .eq('is_admin', false);
 
-  const coveragePercent = Math.round(((covered2 ?? 0) / (totalTerms ?? 96)) * 50); // /2 reviewers
+  const userRank = (aboveMe ?? 0) + 1;
+  const coveragePct = Math.min(Math.round(((totalAgreements ?? 0) / (totalTerms ?? 96)) * 100), 100);
 
   return (
     <div className="p-4 space-y-4">
-      {/* Header */}
+      {/* Header — avatar is clickable → profile */}
       <div className="flex items-center justify-between pt-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
             Hi, {profile?.pseudonym ?? 'Reviewer'}! 👋
           </h1>
-          <p className="text-sm text-gray-500">Today is {format(new Date(), 'EEEE, MMMM d')}</p>
+          <p className="text-sm text-gray-500">{format(new Date(), 'EEEE, MMMM d')}</p>
         </div>
-        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-lg font-bold text-green-700">
+        <Link
+          href="/profile"
+          className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-lg font-bold text-green-700 hover:bg-green-200 transition-colors"
+          title="View profile"
+        >
           {profile?.pseudonym?.charAt(0).toUpperCase()}
-        </div>
+        </Link>
       </div>
 
       {/* Streak banner */}
@@ -65,12 +63,12 @@ export default async function HomePage() {
           <span className="text-2xl">🔥</span>
           <div>
             <p className="font-semibold text-orange-800">Day {profile.current_streak} streak!</p>
-            <p className="text-sm text-orange-600">+3 bonus points for staying consistent</p>
+            <p className="text-sm text-orange-600">Keep contributing to maintain it</p>
           </div>
         </div>
       )}
 
-      {/* Points card */}
+      {/* Points + rank card */}
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-5 text-white">
         <div className="flex justify-between items-start">
           <div>
@@ -78,93 +76,66 @@ export default async function HomePage() {
             <p className="text-4xl font-bold mt-1">{profile?.total_points ?? 0}</p>
           </div>
           <div className="text-right">
-            <p className="text-green-100 text-sm">Rank</p>
-            <p className="text-2xl font-bold mt-1">#{rank?.rank ?? '–'}</p>
+            <p className="text-green-100 text-sm">Your rank</p>
+            <p className="text-2xl font-bold mt-1">
+              #{userRank}
+              <span className="text-sm font-normal text-green-200 ml-1">/ {totalUsers ?? '–'}</span>
+            </p>
           </div>
         </div>
-        <Link
-          href="/leaderboard"
-          className="mt-3 inline-block text-sm text-green-100 hover:text-white underline"
-        >
+        <Link href="/leaderboard" className="mt-3 inline-block text-sm text-green-100 hover:text-white underline">
           View leaderboard →
         </Link>
       </div>
 
       {/* Community progress */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
-        <div className="flex justify-between items-center mb-2">
+      <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+        <div className="flex justify-between items-center">
           <h2 className="font-semibold text-gray-800">Community progress</h2>
-          <span className="text-sm text-gray-500">{Math.min(coveragePercent, 100)}%</span>
+          <span className="text-sm font-bold text-green-600">{coveragePct}%</span>
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className="h-2 bg-green-500 rounded-full transition-all"
-            style={{ width: `${Math.min(coveragePercent, 100)}%` }}
+            className="h-2.5 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all"
+            style={{ width: `${coveragePct}%` }}
           />
         </div>
-        <p className="text-xs text-gray-400 mt-1">
-          {Math.min(covered2 ?? 0, totalTerms ?? 96)}/{totalTerms ?? 96} terms fully reviewed
-        </p>
-      </div>
+        <p className="text-xs text-gray-400">{totalAgreements ?? 0} agreements across {totalTerms ?? 96} terms</p>
 
-      {/* Review queue */}
-      <div>
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold text-gray-800">Your queue</h2>
-          <Link href="/reviews" className="text-sm text-green-600 hover:underline">View all</Link>
+        {/* Activity row */}
+        <div className="grid grid-cols-4 gap-2 pt-1">
+          {[
+            { icon: '🤝', value: totalAgreements ?? 0,   label: 'agreed' },
+            { icon: '✏️', value: totalSuggestions ?? 0,  label: 'suggestions' },
+            { icon: '✅', value: acceptedSuggestions ?? 0, label: 'accepted' },
+            { icon: '📚', value: newTermsProposed ?? 0,  label: 'proposed' },
+          ].map(s => (
+            <div key={s.label} className="text-center">
+              <p className="text-xl leading-none">{s.icon}</p>
+              <p className="text-base font-bold text-gray-800 mt-1">{s.value}</p>
+              <p className="text-xs text-gray-400 leading-tight">{s.label}</p>
+            </div>
+          ))}
         </div>
-
-        {assignments && assignments.length > 0 ? (
-          <div className="space-y-2">
-            {assignments.map((a: any) => (
-              <Link
-                key={a.id}
-                href={`/reviews/${a.id}`}
-                className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-xs font-mono text-gray-400">{a.taxonomy_terms?.term_code}</span>
-                    <p className="font-medium text-gray-800 mt-0.5">{a.taxonomy_terms?.level_2}</p>
-                    <span className="text-xs text-gray-500">{a.taxonomy_terms?.element}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      a.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {a.status === 'in_progress' ? 'In progress' : 'Pending'}
-                    </span>
-                    {a.due_date && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Due {format(new Date(a.due_date), 'MMM d')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-100 p-6 text-center">
-            <p className="text-gray-400 text-sm">All caught up! 🎉</p>
-            <p className="text-xs text-gray-300 mt-1">Check back soon or browse terms to propose new ones.</p>
-            <Link
-              href="/browse"
-              className="mt-3 inline-block text-sm text-green-600 hover:underline"
-            >
-              Browse taxonomy →
-            </Link>
-          </div>
-        )}
       </div>
 
-      {/* Quick action */}
-      <Link
-        href="/reviews"
-        className="block w-full py-3 text-center bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors"
-      >
-        Start reviewing
-      </Link>
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          href="/browse"
+          className="flex flex-col items-center gap-2 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm text-center"
+        >
+          <span className="text-2xl">🔍</span>
+          Browse & review terms
+        </Link>
+        <Link
+          href="/propose"
+          className="flex flex-col items-center gap-2 py-4 bg-white border border-gray-200 hover:border-green-300 text-gray-700 font-semibold rounded-xl transition-colors text-sm text-center"
+        >
+          <span className="text-2xl">📚</span>
+          Propose new term
+        </Link>
+      </div>
     </div>
   );
 }

@@ -16,16 +16,6 @@ export default async function TermDetailPage({ params }: { params: { termId: str
 
   if (!term) notFound();
 
-  const { data: assignment } = user
-    ? await supabase
-        .from('review_assignments')
-        .select('id, status')
-        .eq('term_id', term.id)
-        .eq('reviewer_id', user.id)
-        .in('status', ['pending', 'in_progress'])
-        .maybeSingle()
-    : { data: null };
-
   const { count: reviewCount } = await supabase
     .from('review_assignments')
     .select('*', { count: 'exact', head: true })
@@ -63,17 +53,8 @@ export default async function TermDetailPage({ params }: { params: { termId: str
         </div>
         <h1 className="text-xl font-bold text-gray-900">{term.level_2}</h1>
 
-        {assignment && (
-          <Link
-            href={`/reviews/${assignment.id}`}
-            className="block w-full py-2.5 text-center bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors"
-          >
-            {assignment.status === 'in_progress' ? 'Continue review' : 'Start your review'}
-          </Link>
-        )}
-
-        {/* Agree button — awards points without requiring a suggestion */}
-        {user && !assignment && (
+        {/* Agree button — available to all logged-in users */}
+        {user && (
           <AgreeButton termId={term.id} termCode={term.term_code} userId={user.id} />
         )}
       </div>

@@ -192,12 +192,19 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
   }
 
   // ── Default: all L1 categories grouped by element ────────────────────────
-  const { data: allTerms = [] } = await supabase
-    .from('taxonomy_terms')
-    .select('element, level_1')
-    .eq('is_active', true);
+  const [{ data: allTerms = [] }, { data: l1DefRows = [] }] = await Promise.all([
+    supabase.from('taxonomy_terms').select('element, level_1').eq('is_active', true),
+    // L1 rows have level_2 = null and carry definitions seeded from the Excel
+    supabase.from('taxonomy_terms').select('element, level_1, definition, exclude_if').eq('is_active', true).is('level_2', null),
+  ]);
 
-  // Build element → level1 → count map
+  // Map "element::level_1" → { definition, exclude_if }
+  const l1DefMap: Record<string, { definition?: string; exclude_if?: string }> = {};
+  (l1DefRows ?? []).forEach((t: any) => {
+    if (t.level_1) l1DefMap[`${t.element}::${t.level_1}`] = { definition: t.definition, exclude_if: t.exclude_if };
+  });
+
+  // Build element → level1 → L2-term count map (exclude L1-only rows from count)
   const byElement: Record<string, Record<string, number>> = {};
   (allTerms ?? []).forEach((t: any) => {
     const el = t.element;
@@ -233,21 +240,28 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
               <h2 className="text-base font-bold text-gray-900 mt-1">{ELEMENT_LABELS[el] ?? el}</h2>
               {description && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>}
             </div>
-            {level1List.map(([l1, count]) => (
-              <Link
-                key={l1}
-                href={`/browse?element=${el}&level1=${encodeURIComponent(l1)}`}
-                className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-gray-800">{l1}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 italic">Definition coming soon · {count} term{count !== 1 ? 's' : ''}</p>
+            {level1List.map(([l1, count]) => {
+              const defInfo = l1DefMap[`${el}::${l1}`];
+              return (
+                <Link
+                  key={l1}
+                  href={`/browse?element=${el}&level1=${encodeURIComponent(l1)}`}
+                  className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-800">{l1}</p>
+                      {defInfo?.definition
+                        ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{defInfo.definition}</p>
+                        : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
+                      }
+                      <p className="text-xs text-gray-400 mt-1">{count} term{count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <span className="text-gray-300 text-lg flex-shrink-0">›</span>
                   </div>
-                  <span className="text-gray-300 text-lg">›</span>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         );
       })}

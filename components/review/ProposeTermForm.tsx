@@ -37,15 +37,30 @@ type Level1Data = z.infer<typeof level1Schema>;
 
 interface ExistingTerm { element: string; level_1: string | null; level_2: string | null; }
 
-export function ProposeTermForm({ userId, existingTerms }: { userId: string; existingTerms: ExistingTerm[] }) {
+interface Props {
+  userId: string;
+  existingTerms: ExistingTerm[];
+  defaultType?:    'level_1' | 'level_2';
+  defaultElement?: string;
+  defaultLevel1?:  string;
+}
+
+export function ProposeTermForm({ userId, existingTerms, defaultType, defaultElement, defaultLevel1 }: Props) {
   const router   = useRouter();
   const supabase = createClient();
-  const [success, setSuccess]         = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [proposalType, setProposalType] = useState<'level_2' | 'level_1'>('level_2');
+  const [success, setSuccess]           = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [proposalType, setProposalType] = useState<'level_2' | 'level_1'>(defaultType ?? 'level_2');
+  const [submittedL1, setSubmittedL1]   = useState<{ element: string; level_1: string } | null>(null);
 
-  const level2Form = useForm<Level2Data>({ resolver: zodResolver(level2Schema) });
-  const level1Form = useForm<Level1Data>({ resolver: zodResolver(level1Schema) });
+  const level2Form = useForm<Level2Data>({
+    resolver: zodResolver(level2Schema),
+    defaultValues: { element: defaultElement ?? '', level_1: defaultLevel1 ?? '' },
+  });
+  const level1Form = useForm<Level1Data>({
+    resolver: zodResolver(level1Schema),
+    defaultValues: { element: defaultElement ?? '', level_1: defaultLevel1 ?? '' },
+  });
 
   const selectedElementL2 = level2Form.watch('element') as TaxonomyElement | '';
   const selectedElementL1 = level1Form.watch('element') as TaxonomyElement | '';
@@ -117,6 +132,7 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
         reason:      `New Level 1 category proposed: ${data.level_1}`,
         source_type: 'new_term_submitted',
       });
+      setSubmittedL1({ element: data.element, level_1: data.level_1 });
       setSuccess(true);
     }
     setLoading(false);
@@ -130,10 +146,31 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
           {proposalType === 'level_1' ? 'Category proposed!' : 'Term proposed!'}
         </h2>
         <p className="text-green-600 font-semibold">+15 pts</p>
-        <p className="text-sm text-gray-500">The admin will review your proposal. If accepted, you&apos;ll earn +50 pts.</p>
+        <p className="text-sm text-gray-500 max-w-xs">
+          The admin will review your proposal. If accepted, you&apos;ll earn +50 pts.
+        </p>
+
+        {/* Level 1 success: prompt to also suggest Level 2 terms */}
+        {proposalType === 'level_1' && submittedL1 && (
+          <div className="w-full max-w-xs bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3 mt-2">
+            <p className="text-sm font-semibold text-amber-800">💡 Do you have terms in mind for this category?</p>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              Proposing Level 2 terms for <span className="font-semibold">{submittedL1.level_1}</span> earns you extra points for each one!
+            </p>
+            <button
+              onClick={() => router.push(
+                `/propose?type=level_2&element=${encodeURIComponent(submittedL1.element)}&level1=${encodeURIComponent(submittedL1.level_1)}`
+              )}
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              + Suggest Level 2 terms for this category
+            </button>
+          </div>
+        )}
+
         <button
           onClick={() => router.push('/browse')}
-          className="mt-4 py-2.5 px-6 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
+          className="py-2.5 px-6 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
         >
           Browse taxonomy
         </button>
@@ -153,28 +190,18 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
 
       {/* Type toggle */}
       <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm font-medium">
-        <button
-          type="button"
-          onClick={() => switchType('level_2')}
-          className={`flex-1 py-2.5 transition-colors ${
-            proposalType === 'level_2'
-              ? 'bg-green-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Level 2 term
-        </button>
-        <button
-          type="button"
-          onClick={() => switchType('level_1')}
-          className={`flex-1 py-2.5 transition-colors ${
-            proposalType === 'level_1'
-              ? 'bg-green-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Level 1 category
-        </button>
+        {(['level_2', 'level_1'] as const).map(type => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => switchType(type)}
+            className={`flex-1 py-2.5 transition-colors ${
+              proposalType === type ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {type === 'level_2' ? 'Level 2 term' : 'Level 1 category'}
+          </button>
+        ))}
       </div>
 
       {/* Level explanation */}
@@ -195,7 +222,6 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
       {/* ── LEVEL 2 FORM ── */}
       {proposalType === 'level_2' && (
         <form onSubmit={level2Form.handleSubmit(onSubmitLevel2)} className="space-y-4">
-          {/* Element */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Element *</label>
             <select
@@ -212,7 +238,6 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
             )}
           </div>
 
-          {/* Level 1 — filtered dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Level 1 — Category *</label>
             {selectedElementL2 && level1Options.length > 0 ? (
@@ -237,7 +262,6 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
             )}
           </div>
 
-          {/* Level 2 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Level 2 — Term name *</label>
             <input
@@ -251,24 +275,14 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
           </div>
 
           <SharedFields register={level2Form.register} errors={level2Form.formState.errors} />
-
-          <div className="bg-green-50 rounded-xl p-3 text-sm text-green-700">
-            +15 pts for proposing · +50 pts if accepted by the admin
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-colors"
-          >
-            {loading ? 'Submitting…' : 'Propose term'}
-          </button>
+          <PointsBanner />
+          <SubmitButton loading={loading} label="Propose term" />
         </form>
       )}
 
       {/* ── LEVEL 1 FORM ── */}
       {proposalType === 'level_1' && (
         <form onSubmit={level1Form.handleSubmit(onSubmitLevel1)} className="space-y-4">
-          {/* Element */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Element *</label>
             <select
@@ -285,7 +299,6 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
             )}
           </div>
 
-          {/* Level 1 name — free text input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category name *</label>
             <input
@@ -295,8 +308,8 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
             />
             {selectedElementL1 && (
               <p className="text-xs text-gray-400 mt-1">
-                Existing categories for {ELEMENT_LABELS[selectedElementL1 as TaxonomyElement] ?? selectedElementL1}:{' '}
-                {existingTerms.filter(t => t.element === selectedElementL1 && t.level_1)
+                Existing: {existingTerms
+                  .filter(t => t.element === selectedElementL1 && t.level_1)
                   .map(t => t.level_1!)
                   .filter((v, i, a) => a.indexOf(v) === i)
                   .join(', ') || 'none yet'}
@@ -308,17 +321,8 @@ export function ProposeTermForm({ userId, existingTerms }: { userId: string; exi
           </div>
 
           <SharedFields register={level1Form.register} errors={level1Form.formState.errors} />
-
-          <div className="bg-green-50 rounded-xl p-3 text-sm text-green-700">
-            +15 pts for proposing · +50 pts if accepted by the admin
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-colors"
-          >
-            {loading ? 'Submitting…' : 'Propose category'}
-          </button>
+          <PointsBanner />
+          <SubmitButton loading={loading} label="Propose category" />
         </form>
       )}
     </div>
@@ -330,65 +334,55 @@ function SharedFields({ register, errors }: { register: any; errors: any }) {
     <>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Definition *</label>
-        <textarea
-          {...register('definition')}
-          rows={4}
-          placeholder="Describe what this means in the context of climate adaptation…"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-        />
+        <textarea {...register('definition')} rows={4} placeholder="Describe what this means in the context of climate adaptation…"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
         {errors.definition && <p className="text-red-500 text-xs mt-1">{errors.definition.message}</p>}
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">No adaptation link when</label>
-        <textarea
-          {...register('exclude_if')}
-          rows={2}
-          placeholder="When should this NOT be used?"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-        />
+        <textarea {...register('exclude_if')} rows={2} placeholder="When should this NOT be used?"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">CGIAR Example</label>
-        <textarea
-          {...register('cgiar_example')}
-          rows={2}
-          placeholder="Real example from CGIAR portfolio…"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-        />
+        <textarea {...register('cgiar_example')} rows={2} placeholder="Real example from CGIAR portfolio…"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Related terms <span className="text-gray-400 font-normal">(comma-separated)</span>
         </label>
-        <input
-          {...register('related_terms')}
-          placeholder="e.g. drought stress, water deficit"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <input {...register('related_terms')} placeholder="e.g. drought stress, water deficit"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Links with term</label>
-        <input
-          {...register('reference')}
-          placeholder="Other terms or concepts this links to"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+        <input {...register('reference')} placeholder="Other terms or concepts this links to"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Why should this be added? *</label>
-        <textarea
-          {...register('rationale')}
-          rows={3}
-          placeholder="Explain the gap this fills in the taxonomy…"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-        />
+        <textarea {...register('rationale')} rows={3} placeholder="Explain the gap this fills in the taxonomy…"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
         {errors.rationale && <p className="text-red-500 text-xs mt-1">{errors.rationale.message}</p>}
       </div>
     </>
+  );
+}
+
+function PointsBanner() {
+  return (
+    <div className="bg-green-50 rounded-xl p-3 text-sm text-green-700">
+      +15 pts for proposing · +50 pts if accepted by the admin
+    </div>
+  );
+}
+
+function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
+  return (
+    <button type="submit" disabled={loading}
+      className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-colors">
+      {loading ? 'Submitting…' : label}
+    </button>
   );
 }
