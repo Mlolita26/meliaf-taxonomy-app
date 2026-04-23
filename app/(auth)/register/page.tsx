@@ -77,6 +77,16 @@ export default function RegisterPage() {
       return;
     }
 
+    // Notify admin — fire and forget, don't block UX on email failure
+    fetch('/api/notify-signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pseudonym:   data.pseudonym,
+        institution: data.institution ?? null,
+      }),
+    }).catch(() => {/* ignore */});
+
     router.push('/onboarding');
   }
 

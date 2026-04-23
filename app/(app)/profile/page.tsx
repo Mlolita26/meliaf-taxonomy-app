@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+
+export const dynamic = 'force-dynamic';
 import { SignOutButton } from '@/components/layout/SignOutButton';
 import type { UserBadgeWithDef } from '@/types/database';
 
