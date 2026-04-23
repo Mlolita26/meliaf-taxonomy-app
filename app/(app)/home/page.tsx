@@ -14,6 +14,7 @@ export default async function HomePage() {
     { data: profile },
     { count: totalTerms },
     { count: totalUsers },
+    { data: agreementRows },
     { count: totalAgreements },
     { count: totalSuggestions },
     { count: acceptedSuggestions },
@@ -22,6 +23,7 @@ export default async function HomePage() {
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('taxonomy_terms').select('*', { count: 'exact', head: true }).eq('is_active', true).eq('is_proposed', false),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_admin', false),
+    supabase.from('points_transactions').select('source_id, user_id').eq('source_type', 'term_approved').not('source_id', 'is', null),
     supabase.from('points_transactions').select('*', { count: 'exact', head: true }).eq('source_type', 'term_approved'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true }),
     supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'accepted'),
@@ -36,7 +38,15 @@ export default async function HomePage() {
     .eq('is_admin', false);
 
   const userRank = (aboveMe ?? 0) + 1;
-  const coveragePct = Math.min(Math.round(((totalAgreements ?? 0) / (totalTerms ?? 96)) * 100), 100);
+
+  // Count terms validated by 2+ distinct users
+  const termUsers: Record<string, Set<string>> = {};
+  (agreementRows ?? []).forEach((a: any) => {
+    if (!termUsers[a.source_id]) termUsers[a.source_id] = new Set();
+    termUsers[a.source_id].add(a.user_id);
+  });
+  const coveredTerms = Object.values(termUsers).filter(s => s.size >= 2).length;
+  const coveragePct  = Math.min(Math.round((coveredTerms / (totalTerms ?? 96)) * 100), 100);
 
   return (
     <div className="p-4 space-y-4">
@@ -100,7 +110,7 @@ export default async function HomePage() {
             style={{ width: `${coveragePct}%` }}
           />
         </div>
-        <p className="text-xs text-gray-400">{totalAgreements ?? 0} agreements across {totalTerms ?? 96} terms</p>
+        <p className="text-xs text-gray-400">{coveredTerms} terms validated by 2+ reviewers · {totalTerms ?? 96} total</p>
 
         {/* Activity row */}
         <div className="grid grid-cols-4 gap-2 pt-1">

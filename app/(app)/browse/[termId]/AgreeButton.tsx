@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { motion, AnimatePresence } from 'framer-motion';
 
 type Status = 'checking' | 'available' | 'saving' | 'done';
 
@@ -12,14 +11,23 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
   const supabase = createClient();
 
   useEffect(() => {
-    supabase
-      .from('points_transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('source_type', 'term_approved')
-      .eq('source_id', termId)
-      .then(({ count }) => setStatus((count ?? 0) > 0 ? 'done' : 'available'));
-  }, [userId, termId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Check both source_id (new records) and reason text (old records without source_id)
+    Promise.all([
+      supabase
+        .from('points_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('source_type', 'term_approved')
+        .eq('source_id', termId),
+      supabase
+        .from('points_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('reason', `Agreed with term: ${termCode}`),
+    ]).then(([{ count: c1 }, { count: c2 }]) => {
+      setStatus(((c1 ?? 0) > 0 || (c2 ?? 0) > 0) ? 'done' : 'available');
+    });
+  }, [userId, termId, termCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAgree() {
     if (status !== 'available') return;
@@ -34,14 +42,8 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
     });
 
     if (!error) {
-      // Bump profile total directly for instant visibility
-      const { data: profile } = await supabase
-        .from('profiles').select('total_points').eq('id', userId).single();
-      await supabase.from('profiles')
-        .update({ total_points: (profile?.total_points ?? 0) + 10 })
-        .eq('id', userId);
-
       setShowToast(true);
+      // DB trigger handles total_points increment automatically
       setTimeout(() => { setShowToast(false); setStatus('done'); }, 2200);
     } else {
       setStatus('available');
@@ -50,22 +52,14 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
 
   return (
     <>
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: 30 }}
-            animate={{ opacity: 1, scale: 1,   y: 0  }}
-            exit={{   opacity: 0, scale: 0.8,  y: -50 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
-          >
-            <div className="bg-green-600 text-white px-10 py-6 rounded-3xl shadow-2xl text-center">
-              <div className="text-4xl font-black">+10 pts</div>
-              <div className="text-3xl mt-1">🎉</div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showToast && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="animate-points-popup bg-green-600 text-white px-10 py-6 rounded-3xl shadow-2xl text-center">
+            <div className="text-4xl font-black">+10 pts</div>
+            <div className="text-3xl mt-1">🎉</div>
+          </div>
+        </div>
+      )}
 
       {status === 'checking' && (
         <div className="w-full py-2.5 text-center bg-gray-50 text-gray-400 rounded-xl text-sm border border-gray-100 animate-pulse">

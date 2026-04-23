@@ -16,12 +16,7 @@ export default async function TermDetailPage({ params }: { params: { termId: str
 
   if (!term) notFound();
 
-  const { count: reviewCount } = await supabase
-    .from('review_assignments')
-    .select('*', { count: 'exact', head: true })
-    .eq('term_id', term.id)
-    .neq('status', 'skipped');
-
+  const isL1 = !term.level_2;
   const elementColor = ELEMENT_COLORS[term.element] ?? 'bg-gray-100 text-gray-700';
 
   const fields = [
@@ -32,47 +27,64 @@ export default async function TermDetailPage({ params }: { params: { termId: str
     { key: 'reference',     label: 'Links with term',         value: term.reference },
   ].filter(f => f.value);
 
-  const backHref = term.level_1
-    ? `/browse?element=${term.element}&level1=${encodeURIComponent(term.level_1)}`
-    : `/browse?element=${term.element}`;
+  // Back: L1 terms go to element view; L2 terms go to their parent L1 list
+  const backHref = isL1
+    ? `/browse?element=${term.element}`
+    : `/browse?element=${term.element}&level1=${encodeURIComponent(term.level_1)}`;
+
+  const backLabel = isL1
+    ? (ELEMENT_LABELS[term.element] ?? term.element)
+    : (term.level_1 ?? ELEMENT_LABELS[term.element] ?? term.element);
 
   return (
     <div className="p-4 space-y-4">
       <Link href={backHref} className="text-sm text-gray-500 hover:text-gray-800 pt-2 block">
-        ← {term.level_1 ?? ELEMENT_LABELS[term.element] ?? term.element}
+        ← {backLabel}
       </Link>
 
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${elementColor}`}>
             {ELEMENT_LABELS[term.element] ?? term.element}
           </span>
-          {term.level_1 && <span className="text-xs text-gray-400">{term.level_1}</span>}
-          <span className="ml-auto text-xs text-gray-400">{reviewCount ?? 0}/2 reviewed</span>
+          {!isL1 && term.level_1 && <span className="text-xs text-gray-400">{term.level_1}</span>}
+          {isL1 && <span className="text-xs text-gray-400 font-medium">Level 1 category</span>}
         </div>
-        <h1 className="text-xl font-bold text-gray-900">{term.level_2}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{term.level_2 ?? term.level_1}</h1>
 
         {/* Agree button — available to all logged-in users */}
         {user && (
           <AgreeButton termId={term.id} termCode={term.term_code} userId={user.id} />
         )}
+
+        {/* For L1 terms: link to browse child terms */}
+        {isL1 && term.level_1 && (
+          <Link
+            href={`/browse?element=${term.element}&level1=${encodeURIComponent(term.level_1)}`}
+            className="block w-full py-2 text-center text-sm bg-green-50 text-green-700 border border-green-200 rounded-xl hover:bg-green-100 transition-colors"
+          >
+            Browse terms in this category →
+          </Link>
+        )}
       </div>
 
       {/* Fields */}
-      <div className="space-y-3">
-        {fields.map(f => (
-          <div key={f.key} className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{f.label}</h3>
-              <Link href={`/suggest/${term.id}?field=${f.key}`} className="text-xs text-green-600 hover:underline">
-                Suggest edit
-              </Link>
+      {fields.length > 0 && (
+        <div className="space-y-3">
+          {fields.map(f => (
+            <div key={f.key} className="bg-white rounded-xl border border-gray-100 p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{f.label}</h3>
+                <Link href={`/suggest/${term.id}?field=${f.key}`} className="text-xs text-green-600 hover:underline">
+                  Suggest edit
+                </Link>
+              </div>
+              <p className="text-sm text-gray-800 leading-relaxed">{f.value}</p>
             </div>
-            <p className="text-sm text-gray-800 leading-relaxed">{f.value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pb-4">

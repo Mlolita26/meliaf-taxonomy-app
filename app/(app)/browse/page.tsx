@@ -16,6 +16,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
       .eq('is_active', true)
       .eq('element', element)
       .eq('level_1', level1)
+      .not('level_2', 'is', null)
       .order('level_2');
 
     const termIds = (terms ?? []).map((t: any) => t.id);
@@ -29,6 +30,16 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
     (reviewCounts ?? []).forEach((r: any) => {
       countMap[r.term_id] = (countMap[r.term_id] ?? 0) + 1;
     });
+
+    // Fetch L1 definition row so we can link to it
+    const { data: l1Row } = await supabase
+      .from('taxonomy_terms')
+      .select('id, definition')
+      .eq('is_active', true)
+      .eq('element', element)
+      .eq('level_1', level1)
+      .is('level_2', null)
+      .single();
 
     const elementColor = ELEMENT_COLORS[element] ?? 'bg-gray-100 text-gray-700';
 
@@ -47,7 +58,17 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
             </span>
           </div>
           <h1 className="text-xl font-bold text-gray-900">{level1}</h1>
-          <p className="text-sm text-gray-500 mt-1">{(terms ?? []).length} terms</p>
+          {l1Row?.definition && (
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed">{l1Row.definition}</p>
+          )}
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-gray-500">{(terms ?? []).length} terms</p>
+            {l1Row?.id && (
+              <Link href={`/browse/${l1Row.id}`} className="text-xs text-green-600 hover:underline">
+                Review this category →
+              </Link>
+            )}
+          </div>
         </div>
 
         <Link
@@ -96,9 +117,23 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
       .from('taxonomy_terms')
       .select('id, element, level_1, level_2')
       .eq('is_active', true)
-      .eq('element', element);
+      .eq('element', element)
+      .not('level_2', 'is', null);
 
-    // Group by level_1
+    // Fetch L1 definition rows (level_2 = null) for this element
+    const { data: l1Rows = [] } = await supabase
+      .from('taxonomy_terms')
+      .select('id, level_1, definition')
+      .eq('is_active', true)
+      .eq('element', element)
+      .is('level_2', null);
+
+    const l1InfoMap: Record<string, { id: string; definition?: string }> = {};
+    (l1Rows ?? []).forEach((t: any) => {
+      if (t.level_1) l1InfoMap[t.level_1] = { id: t.id, definition: t.definition };
+    });
+
+    // Group by level_1 (L2-only rows)
     const grouped: Record<string, number> = {};
     (terms ?? []).forEach((t: any) => {
       const l1 = t.level_1 ?? '(no category)';
@@ -128,21 +163,27 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
         <p className="text-sm text-gray-500">{level1List.length} categories · {(terms ?? []).length} terms</p>
 
         <div className="space-y-2">
-          {level1List.map(([l1, count]) => (
-            <Link
-              key={l1}
-              href={`/browse?element=${element}&level1=${encodeURIComponent(l1)}`}
-              className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
-            >
-              <div className="flex justify-between items-center">
-                <div>
+          {level1List.map(([l1, count]) => {
+            const info = l1InfoMap[l1];
+            const cardHref = info?.id ? `/browse/${info.id}` : `/browse?element=${element}&level1=${encodeURIComponent(l1)}`;
+            return (
+              <div key={l1} className="bg-white rounded-xl border border-gray-100 hover:border-green-200 transition-colors overflow-hidden">
+                <Link href={cardHref} className="block p-4">
                   <p className="font-medium text-gray-800">{l1}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{count} term{count !== 1 ? 's' : ''}</p>
+                  {info?.definition
+                    ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{info.definition}</p>
+                    : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
+                  }
+                </Link>
+                <div className="px-4 pb-3 flex items-center justify-between border-t border-gray-50">
+                  <span className="text-xs text-gray-400">{count} term{count !== 1 ? 's' : ''}</span>
+                  <Link href={`/browse?element=${element}&level1=${encodeURIComponent(l1)}`} className="text-xs text-green-600 hover:underline">
+                    See terms →
+                  </Link>
                 </div>
-                <span className="text-gray-300 text-lg">›</span>
               </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -180,7 +221,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${elementColor}`}>{ELEMENT_LABELS[term.element] ?? term.element}</span>
                   {term.level_1 && <span className="text-xs text-gray-400">{term.level_1}</span>}
                 </div>
-                <p className="font-medium text-gray-800">{term.level_2}</p>
+                <p className="font-medium text-gray-800">{term.level_2 ?? term.level_1}</p>
                 {term.definition && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{term.definition}</p>}
               </Link>
             );
@@ -193,18 +234,19 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
 
   // ── Default: all L1 categories grouped by element ────────────────────────
   const [{ data: allTerms = [] }, { data: l1DefRows = [] }] = await Promise.all([
-    supabase.from('taxonomy_terms').select('element, level_1').eq('is_active', true),
-    // L1 rows have level_2 = null and carry definitions seeded from the Excel
-    supabase.from('taxonomy_terms').select('element, level_1, definition, exclude_if').eq('is_active', true).is('level_2', null),
+    // Only L2 rows for accurate term counts
+    supabase.from('taxonomy_terms').select('element, level_1').eq('is_active', true).not('level_2', 'is', null),
+    // L1 rows carry definitions + IDs for linking
+    supabase.from('taxonomy_terms').select('id, element, level_1, definition, exclude_if').eq('is_active', true).is('level_2', null),
   ]);
 
-  // Map "element::level_1" → { definition, exclude_if }
-  const l1DefMap: Record<string, { definition?: string; exclude_if?: string }> = {};
+  // Map "element::level_1" → { id, definition, exclude_if }
+  const l1DefMap: Record<string, { id?: string; definition?: string; exclude_if?: string }> = {};
   (l1DefRows ?? []).forEach((t: any) => {
-    if (t.level_1) l1DefMap[`${t.element}::${t.level_1}`] = { definition: t.definition, exclude_if: t.exclude_if };
+    if (t.level_1) l1DefMap[`${t.element}::${t.level_1}`] = { id: t.id, definition: t.definition, exclude_if: t.exclude_if };
   });
 
-  // Build element → level1 → L2-term count map (exclude L1-only rows from count)
+  // Build element → level1 → L2-term count map
   const byElement: Record<string, Record<string, number>> = {};
   (allTerms ?? []).forEach((t: any) => {
     const el = t.element;
@@ -242,24 +284,28 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
             </div>
             {level1List.map(([l1, count]) => {
               const defInfo = l1DefMap[`${el}::${l1}`];
+              const cardHref = defInfo?.id ? `/browse/${defInfo.id}` : `/browse?element=${el}&level1=${encodeURIComponent(l1)}`;
               return (
-                <Link
-                  key={l1}
-                  href={`/browse?element=${el}&level1=${encodeURIComponent(l1)}`}
-                  className="block bg-white rounded-xl border border-gray-100 p-4 hover:border-green-200 transition-colors"
-                >
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800">{l1}</p>
-                      {defInfo?.definition
-                        ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{defInfo.definition}</p>
-                        : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
-                      }
-                      <p className="text-xs text-gray-400 mt-1">{count} term{count !== 1 ? 's' : ''}</p>
+                <div key={l1} className="bg-white rounded-xl border border-gray-100 hover:border-green-200 transition-colors overflow-hidden">
+                  <Link href={cardHref} className="block p-4">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-800">{l1}</p>
+                        {defInfo?.definition
+                          ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{defInfo.definition}</p>
+                          : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
+                        }
+                      </div>
+                      <span className="text-gray-300 text-lg flex-shrink-0">›</span>
                     </div>
-                    <span className="text-gray-300 text-lg flex-shrink-0">›</span>
+                  </Link>
+                  <div className="px-4 pb-3 flex items-center justify-between border-t border-gray-50">
+                    <span className="text-xs text-gray-400">{count} term{count !== 1 ? 's' : ''}</span>
+                    <Link href={`/browse?element=${el}&level1=${encodeURIComponent(l1)}`} className="text-xs text-green-600 hover:underline">
+                      See terms →
+                    </Link>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

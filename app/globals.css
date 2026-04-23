@@ -15,3 +15,13 @@
     display: none;
   }
 }
+
+@keyframes pointsPopup {
+  0%   { opacity: 0; transform: scale(0.5) translateY(40px); }
+  15%  { opacity: 1; transform: scale(1.1) translateY(0); }
+  85%  { opacity: 1; transform: scale(1)   translateY(0); }
+  100% { opacity: 0; transform: scale(0.9) translateY(-30px); }
+}
+.animate-points-popup {
+  animation: pointsPopup 2.2s ease-out forwards;
+}

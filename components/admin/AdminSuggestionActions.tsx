@@ -39,7 +39,7 @@ export function AdminSuggestionActions({ suggestion }: Props) {
     if (suggestion.suggestion_type === 'new_term' && suggestion.proposed_term) {
       await supabase
         .from('taxonomy_terms')
-        .insert({ ...suggestion.proposed_term, is_proposed: true, proposed_by: suggestion.author_id });
+        .insert({ ...suggestion.proposed_term, is_active: true, is_proposed: false, proposed_by: suggestion.author_id });
     }
 
     // 3. Mark suggestion as accepted
