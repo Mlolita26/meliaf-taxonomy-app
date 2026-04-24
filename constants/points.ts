@@ -10,14 +10,14 @@ export const POINTS = {
   ALL_ASSIGNED_BONUS:       25,
 } as const;
 
-// Ordered list for filter buttons (All is appended at end in the UI)
+// Ordered list for filter buttons — keys must match "Element" column in the Excel exactly
 export const ELEMENT_ORDER = [
   'Rationale',
   'Intervention',
-  'Outcome_process',
-  'Outcome_early',
+  'Output',
+  'Outcome_short',
   'Outcome_intermediate',
-  'Outcome',
+  'Outcome_long',
   'Impact',
   'Beneficiary',
 ];
@@ -25,10 +25,10 @@ export const ELEMENT_ORDER = [
 export const ELEMENT_LABELS: Record<string, string> = {
   Rationale:            'Rationale',
   Intervention:         'Intervention',
-  Outcome_process:      'Outcome (Process)',
-  Outcome_early:        'Outcome (Early)',
+  Output:               'Output',
+  Outcome_short:        'Outcome (Short-term)',
   Outcome_intermediate: 'Outcome (Intermediate)',
-  Outcome:              'Outcome',
+  Outcome_long:         'Outcome (Long-term)',
   Impact:               'Impact',
   Beneficiary:          'Beneficiary',
 };
@@ -36,10 +36,10 @@ export const ELEMENT_LABELS: Record<string, string> = {
 export const ELEMENT_COLORS: Record<string, string> = {
   Rationale:            'bg-orange-100 text-orange-800',
   Intervention:         'bg-blue-100 text-blue-800',
-  Outcome_process:      'bg-purple-100 text-purple-800',
-  Outcome_early:        'bg-teal-100 text-teal-800',
+  Output:               'bg-purple-100 text-purple-800',
+  Outcome_short:        'bg-teal-100 text-teal-800',
   Outcome_intermediate: 'bg-cyan-100 text-cyan-800',
-  Outcome:              'bg-green-100 text-green-800',
+  Outcome_long:         'bg-green-100 text-green-800',
   Impact:               'bg-emerald-100 text-emerald-800',
   Beneficiary:          'bg-pink-100 text-pink-800',
 };
@@ -47,10 +47,10 @@ export const ELEMENT_COLORS: Record<string, string> = {
 export const ELEMENT_FILTER_COLORS: Record<string, { inactive: string; active: string }> = {
   Rationale:            { inactive: 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200',     active: 'bg-orange-300 text-orange-900 border-orange-500 font-semibold' },
   Intervention:         { inactive: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',             active: 'bg-blue-300 text-blue-900 border-blue-500 font-semibold' },
-  Outcome_process:      { inactive: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',     active: 'bg-purple-300 text-purple-900 border-purple-500 font-semibold' },
-  Outcome_early:        { inactive: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',             active: 'bg-teal-300 text-teal-900 border-teal-500 font-semibold' },
+  Output:               { inactive: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200',     active: 'bg-purple-300 text-purple-900 border-purple-500 font-semibold' },
+  Outcome_short:        { inactive: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',             active: 'bg-teal-300 text-teal-900 border-teal-500 font-semibold' },
   Outcome_intermediate: { inactive: 'bg-cyan-100 text-cyan-800 border-cyan-200 hover:bg-cyan-200',             active: 'bg-cyan-300 text-cyan-900 border-cyan-500 font-semibold' },
-  Outcome:              { inactive: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',         active: 'bg-green-300 text-green-900 border-green-500 font-semibold' },
+  Outcome_long:         { inactive: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',         active: 'bg-green-300 text-green-900 border-green-500 font-semibold' },
   Impact:               { inactive: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200', active: 'bg-emerald-300 text-emerald-900 border-emerald-500 font-semibold' },
   Beneficiary:          { inactive: 'bg-pink-100 text-pink-800 border-pink-200 hover:bg-pink-200',             active: 'bg-pink-300 text-pink-900 border-pink-500 font-semibold' },
 };
@@ -58,10 +58,10 @@ export const ELEMENT_FILTER_COLORS: Record<string, { inactive: string; active: s
 export const ELEMENT_DESCRIPTIONS: Record<string, string> = {
   Rationale:            'The climate problem or opportunity that makes adaptation necessary or desirable for a given population or system. Captures why action is needed: the specific hazard, exposure condition, or capacity gap.',
   Intervention:         'The investment area through which CGIAR contributes to addressing the adaptation rationale. Captures what is done: the policy, practice, technology, service, or institutional change delivered or enabled.',
-  Outcome_process:      'A tangible product or service produced by an intervention. Captures what was delivered: assessments completed, plans developed, tools created, systems established.',
-  Outcome_early:        'A first-order change in the reach or awareness of target groups. Captures who was reached and what they know or can now access. Does not yet imply behavior change.',
+  Output:               'A tangible product or service produced by an intervention. Captures what was delivered: assessments completed, plans developed, tools created, systems established.',
+  Outcome_short:        'A first-order change in the reach or awareness of target groups. Captures who was reached and what they know or can now access. Does not yet imply behavior change.',
   Outcome_intermediate: 'A change in behavior, practice, or policy by target groups following exposure to an output or short-term outcome. Captures what people or institutions started doing differently.',
-  Outcome:              'A measurable change in the state of a system — production system, institution, or landscape — resulting from sustained behavior or policy change.',
+  Outcome_long:         'A measurable change in the state of a system — production system, institution, or landscape — resulting from sustained behavior or policy change.',
   Impact:               'A welfare consequence experienced by people as a result of system-level change. Captures what it meant for human wellbeing: income losses avoided, food security maintained, displacement prevented.',
   Beneficiary:          'The person, group, or institution that experiences outcomes or impacts from CGIAR adaptation work. Captures for whom the adaptation chain operates.',
 };

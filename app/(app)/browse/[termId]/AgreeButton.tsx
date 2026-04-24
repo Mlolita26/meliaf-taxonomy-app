@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-type Status = 'checking' | 'available' | 'saving' | 'done';
+type Status = 'checking' | 'available' | 'saving' | 'done' | 'cancelling';
 
 export default function AgreeButton({ termId, termCode, userId }: { termId: string; termCode: string; userId: string }) {
   const [status, setStatus]       = useState<Status>('checking');
@@ -11,7 +11,6 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
   const supabase = createClient();
 
   useEffect(() => {
-    // Check both source_id (new records) and reason text (old records without source_id)
     Promise.all([
       supabase
         .from('points_transactions')
@@ -43,7 +42,6 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
 
     if (!error) {
       setShowToast(true);
-      // DB trigger handles total_points increment; check badges in background
       fetch('/api/check-badges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,6 +51,19 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
     } else {
       setStatus('available');
     }
+  }
+
+  async function handleCancelAgree() {
+    if (status !== 'done') return;
+    setStatus('cancelling');
+
+    await fetch('/api/cancel-agree', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, termId, termCode }),
+    });
+
+    setStatus('available');
   }
 
   return (
@@ -79,15 +90,19 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
           I agree with this term · +10 pts
         </button>
       )}
-      {status === 'saving' && (
+      {(status === 'saving' || status === 'cancelling') && (
         <div className="w-full py-2.5 text-center bg-gray-50 text-gray-400 rounded-xl text-sm border border-gray-100 animate-pulse">
-          Saving…
+          {status === 'saving' ? 'Saving…' : 'Cancelling…'}
         </div>
       )}
       {status === 'done' && (
-        <div className="w-full py-2.5 text-center bg-green-50 text-green-700 font-medium rounded-xl text-sm border border-green-100">
-          ✓ Agreed · +10 pts
-        </div>
+        <button
+          onClick={handleCancelAgree}
+          className="group relative w-full py-2.5 text-center bg-green-50 text-green-700 font-medium rounded-xl text-sm border border-green-100 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+        >
+          <span className="group-hover:hidden">✓ Agreed · +10 pts</span>
+          <span className="hidden group-hover:inline">↩ Cancel agreement · −10 pts</span>
+        </button>
       )}
     </>
   );
