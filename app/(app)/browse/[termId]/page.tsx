@@ -53,6 +53,13 @@ export default async function TermDetailPage({ params }: { params: { termId: str
         </div>
         <h1 className="text-xl font-bold text-gray-900">{term.level_2 ?? term.level_1}</h1>
 
+        {/* Guidance banner for L1 category pages */}
+        {isL1 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
+            <span className="font-semibold">You are viewing a top-level category.</span> You can review and validate its definition below, or explore the specific terms that belong to this category.
+          </div>
+        )}
+
         {/* Agree button — available to all logged-in users */}
         {user && (
           <AgreeButton termId={term.id} termCode={term.term_code} userId={user.id} />
