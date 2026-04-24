@@ -13,19 +13,21 @@ export default async function AdminUsersPage() {
     .select('*')
     .order('total_points', { ascending: false });
 
-  // Fetch auth users (emails) via service role — guarded so a failure doesn't crash the page
+  // Fetch user emails via SECURITY DEFINER RPC (reads auth.users, works with service role)
   const emailMap: Record<string, string> = {};
   try {
     const adminClient = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    const { data: authData } = await adminClient.auth.admin.listUsers();
-    (authData?.users ?? []).forEach((u: any) => {
-      emailMap[u.id] = u.email ?? '';
+    const { data: emailRows, error: emailErr } = await adminClient
+      .rpc('get_user_emails_for_admin');
+    if (emailErr) console.error('[admin/users] email RPC error:', emailErr.message);
+    (emailRows ?? []).forEach((r: any) => {
+      emailMap[r.id] = r.email ?? '';
     });
-  } catch {
-    // Email column will show '—' if the call fails
+  } catch (e: any) {
+    console.error('[admin/users] email fetch threw:', e?.message);
   }
 
   const { data: assignmentCounts } = await supabase
