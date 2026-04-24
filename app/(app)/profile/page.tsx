@@ -15,7 +15,7 @@ export default async function ProfilePage() {
     { data: profile },
     { data: earnedBadges },
     { data: allBadges },
-    { count: reviewsDone },
+    { count: termsAgreed },
     { count: suggestionsMade },
     { count: suggestionsAccepted },
   ] = await Promise.all([
@@ -26,7 +26,7 @@ export default async function ProfilePage() {
       .eq('user_id', user.id)
       .order('earned_at', { ascending: false }),
     supabase.from('badge_definitions').select('*').eq('is_hidden', false).order('sort_order'),
-    supabase.from('review_assignments').select('*', { count: 'exact', head: true }).eq('reviewer_id', user.id).eq('status', 'completed'),
+    supabase.from('points_transactions').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('source_type', 'term_approved'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('author_id', user.id),
     supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('author_id', user.id).eq('status', 'accepted'),
   ]);
@@ -57,7 +57,7 @@ export default async function ProfilePage() {
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: 'Total points', value: profile?.total_points ?? 0, color: 'text-green-700' },
-          { label: 'Reviews done', value: reviewsDone ?? 0, color: 'text-blue-700' },
+          { label: 'Terms agreed', value: termsAgreed ?? 0, color: 'text-blue-700' },
           { label: 'Suggestions', value: suggestionsMade ?? 0, color: 'text-purple-700' },
           { label: 'Accepted', value: suggestionsAccepted ?? 0, color: 'text-emerald-700' },
         ].map(stat => (

@@ -76,9 +76,6 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
       .eq('user_id', userId)
       .eq('reason', `Agreed with term: ${termCode}`);
 
-    // Decrement points via SECURITY DEFINER RPC — only touches the caller's own row
-    await supabase.rpc('decrement_own_points', { p_amount: 10 });
-
     // Refresh server components so home page progress bar + points update instantly
     router.refresh();
     setStatus('available');
