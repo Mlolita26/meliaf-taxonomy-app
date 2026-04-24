@@ -67,6 +67,13 @@ export function AdminSuggestionActions({ suggestion }: Props) {
       type:    'suggestion_status',
     });
 
+    // 6. Check badges for suggestion author
+    fetch('/api/check-badges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: suggestion.author_id }),
+    }).catch(() => {});
+
     setLoading(null);
     router.refresh();
   }

@@ -140,6 +140,9 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
       grouped[l1] = (grouped[l1] ?? 0) + 1;
     });
     const level1List = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+    // Only show L1 categories that have a matching definition row in the DB
+    const filteredLevel1List = level1List.filter(([l1]) => l1InfoMap[l1]?.definition);
+    const filteredTermCount = filteredLevel1List.reduce((sum, [, c]) => sum + c, 0);
     const elementColor = ELEMENT_COLORS[element] ?? 'bg-gray-100 text-gray-700';
     const description = ELEMENT_DESCRIPTIONS[element];
 
@@ -157,23 +160,19 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
           )}
         </div>
 
-        {/* Element filter row */}
         <FilterRow active={element} q={q} />
 
-        <p className="text-sm text-gray-500">{level1List.length} categories · {(terms ?? []).length} terms</p>
+        <p className="text-sm text-gray-500">{filteredLevel1List.length} categories · {filteredTermCount} terms</p>
 
         <div className="space-y-2">
-          {level1List.map(([l1, count]) => {
+          {filteredLevel1List.map(([l1, count]) => {
             const info = l1InfoMap[l1];
             const cardHref = info?.id ? `/browse/${info.id}` : `/browse?element=${element}&level1=${encodeURIComponent(l1)}`;
             return (
               <div key={l1} className="bg-white rounded-xl border border-gray-100 hover:border-green-200 transition-colors overflow-hidden">
                 <Link href={cardHref} className="block p-4">
                   <p className="font-medium text-gray-800">{l1}</p>
-                  {info?.definition
-                    ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{info.definition}</p>
-                    : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
-                  }
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{info!.definition}</p>
                 </Link>
                 <div className="px-4 pb-3 flex items-center justify-between border-t border-gray-50">
                   <span className="text-xs text-gray-400">{count} term{count !== 1 ? 's' : ''}</span>
@@ -273,6 +272,9 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
 
       {ELEMENT_ORDER.filter(el => byElement[el]).map(el => {
         const level1List = Object.entries(byElement[el]).sort(([a], [b]) => a.localeCompare(b));
+        // Only show L1 categories that have a matching definition row in the DB
+        const filteredList = level1List.filter(([l1]) => l1DefMap[`${el}::${l1}`]?.definition);
+        if (filteredList.length === 0) return null;
         const elementColor = ELEMENT_COLORS[el] ?? 'bg-gray-100 text-gray-700';
         const description = ELEMENT_DESCRIPTIONS[el];
         return (
@@ -282,7 +284,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
               <h2 className="text-base font-bold text-gray-900 mt-1">{ELEMENT_LABELS[el] ?? el}</h2>
               {description && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>}
             </div>
-            {level1List.map(([l1, count]) => {
+            {filteredList.map(([l1, count]) => {
               const defInfo = l1DefMap[`${el}::${l1}`];
               const cardHref = defInfo?.id ? `/browse/${defInfo.id}` : `/browse?element=${el}&level1=${encodeURIComponent(l1)}`;
               return (
@@ -291,10 +293,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-800">{l1}</p>
-                        {defInfo?.definition
-                          ? <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{defInfo.definition}</p>
-                          : <p className="text-xs text-gray-300 mt-0.5 italic">Definition coming soon</p>
-                        }
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{defInfo!.definition}</p>
                       </div>
                       <span className="text-gray-300 text-lg flex-shrink-0">›</span>
                     </div>

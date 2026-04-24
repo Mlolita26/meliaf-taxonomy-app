@@ -33,10 +33,17 @@ export async function POST(request: Request) {
       .eq('author_id', userId).eq('status', 'accepted').eq('is_major_change', true),
     supabase.from('suggestions').select('*', { count: 'exact', head: true })
       .eq('author_id', userId).eq('status', 'accepted').eq('suggestion_type', 'new_term'),
-    supabase.from('profiles').select('current_streak').eq('id', userId).single(),
+    supabase.from('profiles').select('current_streak, total_points').eq('id', userId).single(),
     supabase.from('user_badges').select('badge_id').eq('user_id', userId),
     supabase.from('badge_definitions').select('*').eq('is_hidden', false),
   ]);
+
+  // Compute leaderboard rank: how many users have strictly more points
+  const { count: usersAhead } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .gt('total_points', profile?.total_points ?? 0);
+  const rank = (usersAhead ?? 0) + 1;
 
   const earnedIds = new Set((alreadyEarned ?? []).map((b: any) => b.badge_id));
   const stats = {
@@ -46,6 +53,7 @@ export async function POST(request: Request) {
     major_accepted_count: majorAccepted ?? 0,
     new_term_accepted:    newTermsAccepted ?? 0,
     streak:               profile?.current_streak ?? 0,
+    rank,
   };
 
   const toUnlock: { user_id: string; badge_id: string }[] = [];
@@ -62,6 +70,7 @@ export async function POST(request: Request) {
       case 'major_accepted_count': unlocked = stats.major_accepted_count >= (req.threshold ?? 0); break;
       case 'new_term_accepted':    unlocked = stats.new_term_accepted >= (req.threshold ?? 0);    break;
       case 'streak':               unlocked = stats.streak >= (req.threshold ?? 0);               break;
+      case 'rank':                 unlocked = stats.rank <= (req.threshold ?? 1);                 break;
     }
     if (unlocked) {
       toUnlock.push({ user_id: userId, badge_id: badge.id });
