@@ -1,0 +1,57 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+export default function CancelSuggestionButton({ suggestionId }: { suggestionId: string }) {
+  const [phase, setPhase] = useState<'idle' | 'confirming' | 'cancelling'>('idle');
+  const router   = useRouter();
+  const supabase = createClient();
+
+  async function handleCancel() {
+    setPhase('cancelling');
+    await supabase.rpc('cancel_suggestion', { p_suggestion_id: suggestionId });
+    router.push('/reviews');
+  }
+
+  if (phase === 'confirming') {
+    return (
+      <div className="space-y-2 pt-1">
+        <p className="text-sm text-red-700 font-medium">Cancel this suggestion?</p>
+        <p className="text-xs text-gray-500">All points earned for this suggestion will be removed. This cannot be undone.</p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleCancel}
+            className="flex-1 py-2.5 bg-red-600 text-white font-medium rounded-xl text-sm hover:bg-red-700 transition-colors"
+          >
+            Yes, cancel it
+          </button>
+          <button
+            onClick={() => setPhase('idle')}
+            className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-medium rounded-xl text-sm hover:bg-gray-50 transition-colors"
+          >
+            Keep it
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'cancelling') {
+    return (
+      <div className="w-full py-2.5 text-center bg-gray-50 text-gray-400 rounded-xl text-sm border border-gray-100 animate-pulse">
+        Cancelling…
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPhase('confirming')}
+      className="w-full py-2.5 border border-red-200 text-red-600 font-medium rounded-xl hover:bg-red-50 active:scale-95 transition-all text-sm"
+    >
+      ↩ Cancel this suggestion
+    </button>
+  );
+}

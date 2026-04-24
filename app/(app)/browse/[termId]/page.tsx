@@ -3,8 +3,16 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ELEMENT_LABELS, ELEMENT_COLORS } from '@/constants/points';
 import AgreeButton from './AgreeButton';
+import CancelSuggestionButton from './CancelSuggestionButton';
 
-export default async function TermDetailPage({ params }: { params: { termId: string } }) {
+export default async function TermDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { termId: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const suggestionId = typeof searchParams.suggestionId === 'string' ? searchParams.suggestionId : null;
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -83,9 +91,11 @@ export default async function TermDetailPage({ params }: { params: { termId: str
             <div key={f.key} className="bg-white rounded-xl border border-gray-100 p-4">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{f.label}</h3>
-                <Link href={`/suggest/${term.id}?field=${f.key}`} className="text-xs text-green-600 hover:underline">
-                  Suggest edit
-                </Link>
+                {!suggestionId && (
+                  <Link href={`/suggest/${term.id}?field=${f.key}`} className="text-xs text-green-600 hover:underline">
+                    Suggest edit
+                  </Link>
+                )}
               </div>
               <p className="text-sm text-gray-800 leading-relaxed">{f.value}</p>
             </div>
@@ -95,18 +105,24 @@ export default async function TermDetailPage({ params }: { params: { termId: str
 
       {/* Actions */}
       <div className="flex gap-3 pb-4">
-        <Link
-          href={`/suggest/${term.id}`}
-          className="flex-1 py-2.5 text-center border border-green-600 text-green-700 font-medium rounded-xl hover:bg-green-50 transition-colors text-sm"
-        >
-          Suggest a change
-        </Link>
-        <Link
-          href="/propose"
-          className="flex-1 py-2.5 text-center border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors text-sm"
-        >
-          Propose new term
-        </Link>
+        {suggestionId ? (
+          <CancelSuggestionButton suggestionId={suggestionId} />
+        ) : (
+          <>
+            <Link
+              href={`/suggest/${term.id}`}
+              className="flex-1 py-2.5 text-center border border-green-600 text-green-700 font-medium rounded-xl hover:bg-green-50 transition-colors text-sm"
+            >
+              Suggest a change
+            </Link>
+            <Link
+              href="/propose"
+              className="flex-1 py-2.5 text-center border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors text-sm"
+            >
+              Propose new term
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

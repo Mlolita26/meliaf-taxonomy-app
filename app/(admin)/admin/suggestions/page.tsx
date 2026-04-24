@@ -17,7 +17,7 @@ export default async function AdminSuggestionsPage({ searchParams }: { searchPar
     .eq('status', status)
     .order('created_at', { ascending: false });
 
-  const statusOptions = ['submitted', 'accepted', 'rejected', 'draft'];
+  const statusOptions = ['submitted', 'accepted', 'rejected', 'withdrawn', 'draft'];
 
   return (
     <div className="space-y-4">
@@ -92,8 +92,15 @@ export default async function AdminSuggestionsPage({ searchParams }: { searchPar
               <p className="text-sm text-gray-500 italic">&quot;{s.rationale}&quot;</p>
             )}
 
-            {/* Admin note (if rejected) */}
-            {s.admin_note && (
+            {/* Withdrawn-after-acceptance warning */}
+            {s.status === 'withdrawn' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+                ⚠️ <span className="font-semibold">Withdrawn by author after acceptance.</span> The taxonomy change is still in place — review manually if it should be reverted.
+              </div>
+            )}
+
+            {/* Admin note (if rejected or withdrawn) */}
+            {s.admin_note && s.status !== 'withdrawn' && (
               <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2">Admin: {s.admin_note}</p>
             )}
 

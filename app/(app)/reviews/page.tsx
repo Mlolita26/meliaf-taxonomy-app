@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ELEMENT_LABELS, ELEMENT_COLORS } from '@/constants/points';
+import CancelSuggestionButton from '@/app/(app)/browse/[termId]/CancelSuggestionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -195,7 +196,7 @@ export default async function ReviewsPage() {
                 return (
                   <Link
                     key={s.id}
-                    href={`/browse/${s.term_id}`}
+                    href={`/browse/${s.term_id}?suggestionId=${s.id}`}
                     className="block bg-white rounded-xl border border-gray-100 p-3 hover:border-green-200 transition-colors"
                   >
                     {inner}
@@ -203,8 +204,9 @@ export default async function ReviewsPage() {
                 );
               }
               return (
-                <div key={s.id} className="bg-white rounded-xl border border-gray-100 p-3">
+                <div key={s.id} className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
                   {inner}
+                  <CancelSuggestionButton suggestionId={s.id} />
                 </div>
               );
             })}
