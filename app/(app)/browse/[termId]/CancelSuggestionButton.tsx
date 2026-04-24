@@ -2,30 +2,27 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 
 export default function CancelSuggestionButton({ suggestionId }: { suggestionId: string }) {
   const [phase, setPhase] = useState<'idle' | 'confirming' | 'cancelling' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const router   = useRouter();
-  const supabase = createClient();
+  const router = useRouter();
 
   async function handleCancel() {
     setPhase('cancelling');
-    const { data, error } = await supabase.rpc('cancel_suggestion', { p_suggestion_id: suggestionId });
+    const res = await fetch('/api/cancel-suggestion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suggestionId }),
+    });
+    const data = await res.json();
 
-    if (error) {
-      setErrorMsg(error.message);
+    if (!res.ok || data.error) {
+      setErrorMsg(data.error ?? 'Unknown error');
       setPhase('error');
       return;
     }
-    if (data?.error) {
-      setErrorMsg(`Could not cancel: ${data.error}`);
-      setPhase('error');
-      return;
-    }
 
-    // Invalidate RSC cache so /reviews shows updated list instantly
     router.refresh();
     router.push('/reviews');
   }
