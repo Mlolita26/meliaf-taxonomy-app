@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
@@ -7,28 +6,19 @@ export const dynamic = 'force-dynamic';
 export default async function AdminUsersPage() {
   const supabase = createClient();
 
-  // Fetch profiles
   const { data: users } = await supabase
     .from('profiles')
     .select('*')
     .order('total_points', { ascending: false });
 
-  // Fetch user emails via SECURITY DEFINER RPC (reads auth.users, works with service role)
+  // Fetch emails via SECURITY DEFINER RPC (reads auth.users; GRANT EXECUTE to authenticated required)
   const emailMap: Record<string, string> = {};
-  try {
-    const adminClient = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data: emailRows, error: emailErr } = await adminClient
-      .rpc('get_user_emails_for_admin');
-    if (emailErr) console.error('[admin/users] email RPC error:', emailErr.message);
-    (emailRows ?? []).forEach((r: any) => {
-      emailMap[r.id] = r.email ?? '';
-    });
-  } catch (e: any) {
-    console.error('[admin/users] email fetch threw:', e?.message);
-  }
+  const { data: emailRows, error: emailErr } = await supabase
+    .rpc('get_user_emails_for_admin');
+  if (emailErr) console.error('[admin/users] email RPC error:', emailErr.message);
+  (emailRows ?? []).forEach((r: any) => {
+    emailMap[r.id] = r.email ?? '';
+  });
 
   const { data: assignmentCounts } = await supabase
     .from('review_assignments')

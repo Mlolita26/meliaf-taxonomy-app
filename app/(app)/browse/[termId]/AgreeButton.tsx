@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type Status = 'checking' | 'available' | 'saving' | 'done' | 'cancelling';
@@ -8,6 +9,7 @@ type Status = 'checking' | 'available' | 'saving' | 'done' | 'cancelling';
 export default function AgreeButton({ termId, termCode, userId }: { termId: string; termCode: string; userId: string }) {
   const [status, setStatus]       = useState<Status>('checking');
   const [showToast, setShowToast] = useState(false);
+  const router   = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -47,7 +49,11 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       }).catch(() => {});
-      setTimeout(() => { setShowToast(false); setStatus('done'); }, 2200);
+      setTimeout(() => {
+        setShowToast(false);
+        setStatus('done');
+        router.refresh();
+      }, 2200);
     } else {
       setStatus('available');
     }
@@ -57,12 +63,24 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
     if (status !== 'done') return;
     setStatus('cancelling');
 
-    await fetch('/api/cancel-agree', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, termId, termCode }),
-    });
+    // Delete new-style transaction (matched by source_id)
+    await supabase.from('points_transactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('source_type', 'term_approved')
+      .eq('source_id', termId);
 
+    // Delete legacy-style transaction (matched by reason text)
+    await supabase.from('points_transactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('reason', `Agreed with term: ${termCode}`);
+
+    // Decrement points via SECURITY DEFINER RPC — only touches the caller's own row
+    await supabase.rpc('decrement_own_points', { p_amount: 10 });
+
+    // Refresh server components so home page progress bar + points update instantly
+    router.refresh();
     setStatus('available');
   }
 
