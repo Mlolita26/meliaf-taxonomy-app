@@ -5,14 +5,44 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 export default function CancelSuggestionButton({ suggestionId }: { suggestionId: string }) {
-  const [phase, setPhase] = useState<'idle' | 'confirming' | 'cancelling'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'confirming' | 'cancelling' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
   const router   = useRouter();
   const supabase = createClient();
 
   async function handleCancel() {
     setPhase('cancelling');
-    await supabase.rpc('cancel_suggestion', { p_suggestion_id: suggestionId });
+    const { data, error } = await supabase.rpc('cancel_suggestion', { p_suggestion_id: suggestionId });
+
+    if (error) {
+      setErrorMsg(error.message);
+      setPhase('error');
+      return;
+    }
+    if (data?.error) {
+      setErrorMsg(`Could not cancel: ${data.error}`);
+      setPhase('error');
+      return;
+    }
+
+    // Invalidate RSC cache so /reviews shows updated list instantly
+    router.refresh();
     router.push('/reviews');
+  }
+
+  if (phase === 'error') {
+    return (
+      <div className="space-y-2 pt-1">
+        <p className="text-sm text-red-700 font-medium">Something went wrong</p>
+        <p className="text-xs text-red-500">{errorMsg}</p>
+        <button
+          onClick={() => setPhase('idle')}
+          className="w-full py-2 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (phase === 'confirming') {
