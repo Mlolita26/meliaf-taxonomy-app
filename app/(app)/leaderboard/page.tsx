@@ -35,7 +35,7 @@ export default async function LeaderboardPage() {
   // Podium order: 2nd, 1st, 3rd (visual)
   const podiumOrder = [1, 0, 2];
   const podiumHeights = ['h-20', 'h-28', 'h-16'];
-  const podiumColors  = ['bg-gray-300', 'bg-yellow-400', 'bg-amber-600'];
+  const podiumColors  = ['bg-yellow-400', 'bg-gray-300', 'bg-amber-600'];
   const medals        = ['🥇', '🥈', '🥉'];
 
   return (

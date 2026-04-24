@@ -35,7 +35,16 @@ const level1Schema = z.object({
 type Level2Data = z.infer<typeof level2Schema>;
 type Level1Data = z.infer<typeof level1Schema>;
 
-interface SuggestedL2 { name: string; definition: string }
+interface SuggestedL2 {
+  name: string;
+  definition: string;
+  exclude_if: string;
+  cgiar_example: string;
+  related_terms: string;
+  reference: string;
+  confidence: number;
+}
+
 interface ExistingTerm { element: string; level_1: string | null; level_2: string | null; }
 
 interface Props {
@@ -46,6 +55,11 @@ interface Props {
   defaultLevel1?:  string;
 }
 
+const BLANK_L2: SuggestedL2 = {
+  name: '', definition: '', exclude_if: '', cgiar_example: '',
+  related_terms: '', reference: '', confidence: 4,
+};
+
 export function ProposeTermForm({ userId, existingTerms, defaultType, defaultElement, defaultLevel1 }: Props) {
   const router   = useRouter();
   const supabase = createClient();
@@ -54,7 +68,9 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
   const [proposalType, setProposalType] = useState<'level_2' | 'level_1'>(defaultType ?? 'level_2');
   const [submittedL1, setSubmittedL1]   = useState<{ element: string; level_1: string; l2Count: number } | null>(null);
 
-  // Level 2 terms the user wants to suggest alongside the new L1 category
+  const [confidenceL2, setConfidenceL2] = useState(4);
+  const [confidenceL1, setConfidenceL1] = useState(4);
+
   const [suggestedL2s, setSuggestedL2s] = useState<SuggestedL2[]>([]);
   const [l2Error, setL2Error]           = useState<string | null>(null);
 
@@ -82,10 +98,12 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
     level1Form.reset();
     setSuggestedL2s([]);
     setL2Error(null);
+    setConfidenceL2(4);
+    setConfidenceL1(4);
   }
 
   function addL2Entry() {
-    setSuggestedL2s(prev => [...prev, { name: '', definition: '' }]);
+    setSuggestedL2s(prev => [...prev, { ...BLANK_L2 }]);
     setL2Error(null);
   }
 
@@ -93,7 +111,7 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
     setSuggestedL2s(prev => prev.filter((_, j) => j !== i));
   }
 
-  function updateL2Entry(i: number, field: keyof SuggestedL2, value: string) {
+  function updateL2Entry(i: number, field: keyof SuggestedL2, value: string | number) {
     setSuggestedL2s(prev => prev.map((v, j) => j === i ? { ...v, [field]: value } : v));
     setL2Error(null);
   }
@@ -103,6 +121,7 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
     const { error } = await supabase.from('suggestions').insert({
       author_id:       userId,
       suggestion_type: 'new_term',
+      confidence:      confidenceL2,
       proposed_term: {
         element:       data.element,
         level_1:       data.level_1,
@@ -134,7 +153,6 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
   }
 
   async function onSubmitLevel1(data: Level1Data) {
-    // Validate any L2 entries the user added
     const filledL2s = suggestedL2s.filter(t => t.name.trim() || t.definition.trim());
     const incompleteL2 = filledL2s.filter(t => !t.name.trim() || !t.definition.trim());
     if (incompleteL2.length > 0) {
@@ -144,10 +162,10 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
 
     setLoading(true);
 
-    // Insert L1 suggestion
     const { error } = await supabase.from('suggestions').insert({
       author_id:       userId,
       suggestion_type: 'new_term',
+      confidence:      confidenceL1,
       proposed_term: {
         element:       data.element,
         level_1:       data.level_1,
@@ -170,20 +188,20 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
         source_type: 'new_term_submitted',
       });
 
-      // Insert each suggested L2 term as its own suggestion
       for (const l2 of filledL2s) {
         await supabase.from('suggestions').insert({
           author_id:       userId,
           suggestion_type: 'new_term',
+          confidence:      l2.confidence,
           proposed_term: {
             element:       data.element,
             level_1:       data.level_1,
             level_2:       l2.name.trim(),
             definition:    l2.definition.trim(),
-            exclude_if:    null,
-            cgiar_example: null,
-            related_terms: [],
-            reference:     null,
+            exclude_if:    l2.exclude_if.trim() || null,
+            cgiar_example: l2.cgiar_example.trim() || null,
+            related_terms: l2.related_terms.split(',').map(s => s.trim()).filter(Boolean),
+            reference:     l2.reference.trim() || null,
           },
           rationale: `Proposed alongside new Level 1 category: ${data.level_1}`,
           status:    'submitted',
@@ -231,7 +249,6 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
           The admin will review your proposal. If accepted, you&apos;ll earn +50 pts per item.
         </p>
 
-        {/* Prompt to add more L2 terms only if none were submitted with the L1 */}
         {proposalType === 'level_1' && submittedL1 && submittedL1.l2Count === 0 && (
           <div className="w-full max-w-xs bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3 mt-2">
             <p className="text-sm font-semibold text-amber-800">💡 Do you have terms in mind for this category?</p>
@@ -356,6 +373,9 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
           </div>
 
           <SharedFields register={level2Form.register} errors={level2Form.formState.errors} />
+
+          <ConfidenceSelector value={confidenceL2} onChange={setConfidenceL2} />
+
           <PointsBanner pts={15} />
           <SubmitButton loading={loading} label="Propose term" />
         </form>
@@ -403,6 +423,8 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
 
           <SharedFields register={level1Form.register} errors={level1Form.formState.errors} />
 
+          <ConfidenceSelector value={confidenceL1} onChange={setConfidenceL1} />
+
           {/* ── Suggested Level 2 terms ── */}
           <div className="space-y-3 pt-1">
             <div className="border-t border-gray-100 pt-4">
@@ -416,7 +438,7 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
             </div>
 
             {suggestedL2s.map((entry, i) => (
-              <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+              <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Term {i + 1}</span>
                   <button
@@ -427,6 +449,7 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
                     Remove
                   </button>
                 </div>
+
                 <input
                   value={entry.name}
                   onChange={e => updateL2Entry(i, 'name', e.target.value)}
@@ -439,6 +462,40 @@ export function ProposeTermForm({ userId, existingTerms, defaultType, defaultEle
                   placeholder="Definition *"
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white"
+                />
+
+                <p className="text-xs text-gray-400 font-medium pt-1">Optional fields</p>
+
+                <textarea
+                  value={entry.exclude_if}
+                  onChange={e => updateL2Entry(i, 'exclude_if', e.target.value)}
+                  placeholder="No adaptation link when…"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white"
+                />
+                <textarea
+                  value={entry.cgiar_example}
+                  onChange={e => updateL2Entry(i, 'cgiar_example', e.target.value)}
+                  placeholder="CGIAR example…"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none bg-white"
+                />
+                <input
+                  value={entry.related_terms}
+                  onChange={e => updateL2Entry(i, 'related_terms', e.target.value)}
+                  placeholder="Related terms (comma-separated)"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                />
+                <input
+                  value={entry.reference}
+                  onChange={e => updateL2Entry(i, 'reference', e.target.value)}
+                  placeholder="Links with term"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                />
+
+                <ConfidenceSelector
+                  value={entry.confidence}
+                  onChange={v => updateL2Entry(i, 'confidence', v)}
                 />
               </div>
             ))}
@@ -474,24 +531,30 @@ function SharedFields({ register, errors }: { register: any; errors: any }) {
         {errors.definition && <p className="text-red-500 text-xs mt-1">{errors.definition.message}</p>}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">No adaptation link when</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          No adaptation link when <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
         <textarea {...register('exclude_if')} rows={2} placeholder="When should this NOT be used?"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">CGIAR Example</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          CGIAR Example <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
         <textarea {...register('cgiar_example')} rows={2} placeholder="Real example from CGIAR portfolio…"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Related terms <span className="text-gray-400 font-normal">(comma-separated)</span>
+          Related terms <span className="text-gray-400 font-normal">(optional, comma-separated)</span>
         </label>
         <input {...register('related_terms')} placeholder="e.g. drought stress, water deficit"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Links with term</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Links with term <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
         <input {...register('reference')} placeholder="Other terms or concepts this links to"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
@@ -502,6 +565,36 @@ function SharedFields({ register, errors }: { register: any; errors: any }) {
         {errors.rationale && <p className="text-red-500 text-xs mt-1">{errors.rationale.message}</p>}
       </div>
     </>
+  );
+}
+
+function ConfidenceSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Confidence</label>
+      <div className="grid grid-cols-4 gap-2">
+        {([
+          { value: 1, stars: '⭐', label: 'Unsure' },
+          { value: 2, stars: '⭐⭐', label: 'Somewhat' },
+          { value: 4, stars: '⭐⭐⭐⭐', label: 'Confident' },
+          { value: 5, stars: '⭐⭐⭐⭐⭐', label: 'Very sure' },
+        ] as const).map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-medium transition-colors ${
+              value === opt.value
+                ? 'border-green-500 bg-green-50 text-green-700'
+                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+            }`}
+          >
+            <span className="text-base leading-none">{opt.stars}</span>
+            <span>{opt.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
