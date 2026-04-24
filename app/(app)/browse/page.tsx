@@ -139,6 +139,10 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
       const l1 = t.level_1 ?? '(no category)';
       grouped[l1] = (grouped[l1] ?? 0) + 1;
     });
+    // Include L1 categories that have no L2 terms yet (e.g. Impact)
+    (l1Rows ?? []).forEach((t: any) => {
+      if (t.level_1 && !(t.level_1 in grouped)) grouped[t.level_1] = 0;
+    });
     const level1List = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
     // Only show L1 categories that have a matching definition row in the DB
     const filteredLevel1List = level1List.filter(([l1]) => l1InfoMap[l1]?.definition);
@@ -252,6 +256,13 @@ export default async function BrowsePage({ searchParams }: { searchParams: Searc
     const l1 = t.level_1 ?? '(no category)';
     if (!byElement[el]) byElement[el] = {};
     byElement[el][l1] = (byElement[el][l1] ?? 0) + 1;
+  });
+  // Also include elements that only have L1 definition rows and no L2 terms yet (e.g. Impact)
+  (l1DefRows ?? []).forEach((t: any) => {
+    if (t.element && t.level_1) {
+      if (!byElement[t.element]) byElement[t.element] = {};
+      if (!(t.level_1 in byElement[t.element])) byElement[t.element][t.level_1] = 0;
+    }
   });
 
   return (
