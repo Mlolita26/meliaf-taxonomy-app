@@ -15,7 +15,6 @@ export default async function LeaderboardPage() {
     supabase
       .from('profiles')
       .select('id, pseudonym, total_points, institution')
-      .eq('is_admin', false)
       .order('total_points', { ascending: false }),
     supabase.from('app_settings').select('value').eq('key', 'reward_config').single(),
   ]);

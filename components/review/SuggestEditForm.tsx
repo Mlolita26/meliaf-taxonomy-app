@@ -66,6 +66,11 @@ export function SuggestEditForm({ term, userId, preSelectedField, assignmentId }
         reason:      `Field edit suggestion: ${data.field_name} on ${term.term_code}`,
         source_type: 'suggestion_submitted',
       });
+      fetch('/api/check-badges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }).catch(() => {});
       setSuccess(true);
     }
     setLoading(false);

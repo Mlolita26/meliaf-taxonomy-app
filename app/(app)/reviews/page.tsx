@@ -14,8 +14,8 @@ export default async function ReviewsPage() {
   const [
     { data: agreedTxns },
     { data: suggestions },
+    { data: notifications },
   ] = await Promise.all([
-    // Terms the user agreed with — use source_id to look up the term
     supabase
       .from('points_transactions')
       .select('source_id, created_at')
@@ -24,9 +24,15 @@ export default async function ReviewsPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('suggestions')
-      .select('id, suggestion_type, field_name, status, proposed_value, proposed_term, created_at')
+      .select('id, suggestion_type, field_name, term_id, status, proposed_value, proposed_term, created_at')
       .eq('author_id', user.id)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('notifications')
+      .select('id, title, body, type, read')
+      .eq('user_id', user.id)
+      .order('id', { ascending: false })
+      .limit(8),
   ]);
 
   // Fetch term details for agreed terms
@@ -37,10 +43,20 @@ export default async function ReviewsPage() {
         .select('id, term_code, element, level_1, level_2')
         .in('id', termIds)
     : { data: [] };
-
   const termMap = Object.fromEntries((agreedTerms ?? []).map(t => [t.id, t]));
 
-  const suggestionsAccepted = (suggestions ?? []).filter(s => s.status === 'accepted').length;
+  // Fetch term details for field-edit suggestions
+  const suggestionTermIds = (suggestions ?? []).map((s: any) => s.term_id).filter(Boolean);
+  const { data: suggestionTerms } = suggestionTermIds.length
+    ? await supabase
+        .from('taxonomy_terms')
+        .select('id, term_code, element, level_1, level_2')
+        .in('id', suggestionTermIds)
+    : { data: [] };
+  const suggestionTermMap = Object.fromEntries((suggestionTerms ?? []).map(t => [t.id, t]));
+
+  const suggestionsAccepted = (suggestions ?? []).filter((s: any) => s.status === 'accepted').length;
+  const unreadNotifs = (notifications ?? []).filter((n: any) => !n.read);
 
   const statusStyle: Record<string, string> = {
     submitted: 'bg-yellow-100 text-yellow-700',
@@ -68,11 +84,32 @@ export default async function ReviewsPage() {
         ))}
       </div>
 
+      {/* Notifications */}
+      {(notifications ?? []).length > 0 && (
+        <section>
+          <h2 className="font-semibold text-gray-700 mb-2">
+            Notifications
+            {unreadNotifs.length > 0 && (
+              <span className="ml-2 text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">{unreadNotifs.length} new</span>
+            )}
+          </h2>
+          <div className="space-y-2">
+            {(notifications ?? []).map((n: any) => (
+              <div
+                key={n.id}
+                className={`rounded-xl border p-3 ${n.read ? 'bg-white border-gray-100' : 'bg-green-50 border-green-200'}`}
+              >
+                <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Terms I agreed with */}
       <section>
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold text-gray-700">Terms I agreed with ({agreedTxns?.length ?? 0})</h2>
-        </div>
+        <h2 className="font-semibold text-gray-700 mb-2">Terms I agreed with ({agreedTxns?.length ?? 0})</h2>
         {agreedTxns && agreedTxns.length > 0 ? (
           <div className="space-y-2">
             {agreedTxns.map((txn: any) => {
@@ -93,7 +130,7 @@ export default async function ReviewsPage() {
                         </span>
                         {term.level_1 && <span className="text-xs text-gray-400 truncate">{term.level_1}</span>}
                       </div>
-                      <p className="font-medium text-gray-800 truncate">{term.level_2}</p>
+                      <p className="font-medium text-gray-800 truncate">{term.level_2 ?? term.level_1}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="text-xs text-green-600 font-medium">+10 pts</span>
@@ -116,37 +153,58 @@ export default async function ReviewsPage() {
 
       {/* My suggestions */}
       <section>
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold text-gray-700">My suggestions ({suggestions?.length ?? 0})</h2>
-        </div>
+        <h2 className="font-semibold text-gray-700 mb-2">My suggestions ({suggestions?.length ?? 0})</h2>
         {suggestions && suggestions.length > 0 ? (
           <div className="space-y-2">
-            {suggestions.map((s: any) => {
+            {(suggestions as any[]).map((s) => {
               const isNewTerm = s.suggestion_type === 'new_term';
+              const suggTerm  = s.term_id ? suggestionTermMap[s.term_id] : null;
+              const termName  = suggTerm
+                ? (suggTerm.level_2 ?? suggTerm.level_1 ?? suggTerm.term_code)
+                : null;
               const label = isNewTerm
                 ? `New term: ${s.proposed_term?.level_2 ?? s.proposed_term?.level_1 ?? 'Proposal'}`
                 : `Edit: ${s.field_name ?? s.suggestion_type}`;
-              return (
-                <div key={s.id} className="bg-white rounded-xl border border-gray-100 p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${isNewTerm ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {isNewTerm ? '📚 New term' : '✏️ Edit'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-800 truncate">{label}</p>
-                      {!isNewTerm && s.proposed_value && (
-                        <p className="text-xs text-gray-400 truncate mt-0.5">"{s.proposed_value}"</p>
+
+              const inner = (
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${isNewTerm ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {isNewTerm ? '📚 New term' : '✏️ Edit'}
+                      </span>
+                      {termName && (
+                        <span className="text-xs text-gray-500 truncate font-medium">{termName}</span>
                       )}
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[s.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {s.status}
-                      </span>
-                      <p className="text-xs text-gray-400 mt-1">{format(new Date(s.created_at), 'MMM d')}</p>
-                    </div>
+                    <p className="text-sm text-gray-800 truncate">{label}</p>
+                    {!isNewTerm && s.proposed_value && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">"{s.proposed_value}"</p>
+                    )}
                   </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[s.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                      {s.status}
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">{format(new Date(s.created_at), 'MMM d')}</p>
+                  </div>
+                </div>
+              );
+
+              if (s.term_id) {
+                return (
+                  <Link
+                    key={s.id}
+                    href={`/browse/${s.term_id}`}
+                    className="block bg-white rounded-xl border border-gray-100 p-3 hover:border-green-200 transition-colors"
+                  >
+                    {inner}
+                  </Link>
+                );
+              }
+              return (
+                <div key={s.id} className="bg-white rounded-xl border border-gray-100 p-3">
+                  {inner}
                 </div>
               );
             })}

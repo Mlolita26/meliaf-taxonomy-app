@@ -22,7 +22,7 @@ export default async function HomePage() {
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('taxonomy_terms').select('*', { count: 'exact', head: true }).eq('is_active', true).eq('is_proposed', false),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_admin', false),
+    supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('points_transactions').select('source_id, user_id').eq('source_type', 'term_approved').not('source_id', 'is', null),
     supabase.from('points_transactions').select('*', { count: 'exact', head: true }).eq('source_type', 'term_approved'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true }),
@@ -34,8 +34,7 @@ export default async function HomePage() {
   const { count: aboveMe } = await supabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
-    .gt('total_points', profile?.total_points ?? 0)
-    .eq('is_admin', false);
+    .gt('total_points', profile?.total_points ?? 0);
 
   const userRank = (aboveMe ?? 0) + 1;
 

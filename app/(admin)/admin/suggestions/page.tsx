@@ -12,7 +12,7 @@ export default async function AdminSuggestionsPage({ searchParams }: { searchPar
     .select(`
       *,
       profiles!suggestions_author_id_fkey(pseudonym, institution),
-      taxonomy_terms(term_code, element, level_2)
+      taxonomy_terms(term_code, element, level_1, level_2)
     `)
     .eq('status', status)
     .order('created_at', { ascending: false });
@@ -47,7 +47,10 @@ export default async function AdminSuggestionsPage({ searchParams }: { searchPar
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-medium text-gray-900">
-                  {s.taxonomy_terms?.term_code ?? 'New term'} · {s.field_name ?? s.suggestion_type}
+                  {s.taxonomy_terms
+                    ? (s.taxonomy_terms.level_2 ?? s.taxonomy_terms.level_1 ?? s.taxonomy_terms.term_code)
+                    : 'New term'}
+                  {' · '}{s.field_name ?? s.suggestion_type}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   by @{s.profiles?.pseudonym} · {new Date(s.created_at).toLocaleDateString()}

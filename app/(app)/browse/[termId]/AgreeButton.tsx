@@ -43,7 +43,12 @@ export default function AgreeButton({ termId, termCode, userId }: { termId: stri
 
     if (!error) {
       setShowToast(true);
-      // DB trigger handles total_points increment automatically
+      // DB trigger handles total_points increment; check badges in background
+      fetch('/api/check-badges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }).catch(() => {});
       setTimeout(() => { setShowToast(false); setStatus('done'); }, 2200);
     } else {
       setStatus('available');
