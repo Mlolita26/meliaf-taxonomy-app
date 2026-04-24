@@ -13,8 +13,8 @@ export default async function AdminAgreementsPage() {
     .not('source_id', 'is', null)
     .order('created_at', { ascending: false });
 
-  const userIds = [...new Set((txns ?? []).map((t: any) => t.user_id))];
-  const termIds = [...new Set((txns ?? []).map((t: any) => t.source_id).filter(Boolean))];
+  const userIds = Array.from(new Set((txns ?? []).map((t: any) => t.user_id)));
+  const termIds = Array.from(new Set((txns ?? []).map((t: any) => t.source_id).filter(Boolean)));
 
   const [{ data: profiles }, { data: terms }] = await Promise.all([
     userIds.length
