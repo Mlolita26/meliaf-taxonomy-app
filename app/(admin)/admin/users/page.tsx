@@ -13,16 +13,20 @@ export default async function AdminUsersPage() {
     .select('*')
     .order('total_points', { ascending: false });
 
-  // Fetch auth users (emails) via service role
-  const adminClient = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-  const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers();
+  // Fetch auth users (emails) via service role — guarded so a failure doesn't crash the page
   const emailMap: Record<string, string> = {};
-  (authUsers ?? []).forEach((u: any) => {
-    emailMap[u.id] = u.email ?? '';
-  });
+  try {
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: authData } = await adminClient.auth.admin.listUsers();
+    (authData?.users ?? []).forEach((u: any) => {
+      emailMap[u.id] = u.email ?? '';
+    });
+  } catch {
+    // Email column will show '—' if the call fails
+  }
 
   const { data: assignmentCounts } = await supabase
     .from('review_assignments')
@@ -66,7 +70,7 @@ export default async function AdminUsersPage() {
                   <td className="px-3 py-2 text-gray-600">{counts.done}/{counts.total}</td>
                   <td className="px-3 py-2 text-orange-600">🔥 {u.current_streak}d</td>
                   <td className="px-3 py-2 text-gray-400 text-xs">
-                    {format(new Date(u.created_at), 'MMM d, yyyy')}
+                    {u.created_at ? format(new Date(u.created_at), 'MMM d, yyyy') : '—'}
                   </td>
                   <td className="px-3 py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
