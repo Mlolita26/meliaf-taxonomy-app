@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -7,10 +7,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // Use the session-based server client — no SUPABASE_SERVICE_ROLE_KEY needed
+  const supabase = createClient();
+
+  // Verify the caller is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+
+  // Always check badges for the authenticated user (prevents spoofing via userId param)
+  const uid = user.id;
 
   const [
     { count: agreementsCount },
@@ -22,23 +29,22 @@ export async function POST(request: Request) {
     { data: alreadyEarned },
     { data: badges },
   ] = await Promise.all([
-    // Agreements count acts as "reviews done" since assignment system was removed
     supabase.from('points_transactions').select('*', { count: 'exact', head: true })
-      .eq('user_id', userId).eq('source_type', 'term_approved'),
+      .eq('user_id', uid).eq('source_type', 'term_approved'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true })
-      .eq('author_id', userId).neq('status', 'draft'),
+      .eq('author_id', uid).neq('status', 'draft'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true })
-      .eq('author_id', userId).eq('status', 'accepted'),
+      .eq('author_id', uid).eq('status', 'accepted'),
     supabase.from('suggestions').select('*', { count: 'exact', head: true })
-      .eq('author_id', userId).eq('status', 'accepted').eq('is_major_change', true),
+      .eq('author_id', uid).eq('status', 'accepted').eq('is_major_change', true),
     supabase.from('suggestions').select('*', { count: 'exact', head: true })
-      .eq('author_id', userId).eq('status', 'accepted').eq('suggestion_type', 'new_term'),
-    supabase.from('profiles').select('current_streak, total_points').eq('id', userId).single(),
-    supabase.from('user_badges').select('badge_id').eq('user_id', userId),
+      .eq('author_id', uid).eq('status', 'accepted').eq('suggestion_type', 'new_term'),
+    supabase.from('profiles').select('current_streak, total_points').eq('id', uid).single(),
+    supabase.from('user_badges').select('badge_id').eq('user_id', uid),
     supabase.from('badge_definitions').select('*').eq('is_hidden', false),
   ]);
 
-  // Compute leaderboard rank: how many users have strictly more points
+  // Compute leaderboard rank
   const { count: usersAhead } = await supabase
     .from('profiles')
     .select('*', { count: 'exact', head: true })
@@ -46,6 +52,7 @@ export async function POST(request: Request) {
   const rank = (usersAhead ?? 0) + 1;
 
   const earnedIds = new Set((alreadyEarned ?? []).map((b: any) => b.badge_id));
+
   const stats = {
     review_count:         agreementsCount ?? 0,
     suggestion_count:     suggestionsSubmitted ?? 0,
@@ -64,22 +71,22 @@ export async function POST(request: Request) {
     const req = badge.requirement as { type: string; threshold?: number };
     let unlocked = false;
     switch (req.type) {
-      case 'review_count':         unlocked = stats.review_count >= (req.threshold ?? 0);         break;
-      case 'suggestion_count':     unlocked = stats.suggestion_count >= (req.threshold ?? 0);     break;
-      case 'accepted_count':       unlocked = stats.accepted_count >= (req.threshold ?? 0);       break;
+      case 'review_count':         unlocked = stats.review_count         >= (req.threshold ?? 0); break;
+      case 'suggestion_count':     unlocked = stats.suggestion_count     >= (req.threshold ?? 0); break;
+      case 'accepted_count':       unlocked = stats.accepted_count       >= (req.threshold ?? 0); break;
       case 'major_accepted_count': unlocked = stats.major_accepted_count >= (req.threshold ?? 0); break;
-      case 'new_term_accepted':    unlocked = stats.new_term_accepted >= (req.threshold ?? 0);    break;
-      case 'streak':               unlocked = stats.streak >= (req.threshold ?? 0);               break;
-      case 'rank':                 unlocked = stats.rank <= (req.threshold ?? 1);                 break;
+      case 'new_term_accepted':    unlocked = stats.new_term_accepted    >= (req.threshold ?? 0); break;
+      case 'streak':               unlocked = stats.streak               >= (req.threshold ?? 0); break;
+      case 'rank':                 unlocked = stats.rank                 <= (req.threshold ?? 1); break;
     }
     if (unlocked) {
-      toUnlock.push({ user_id: userId, badge_id: badge.id });
+      toUnlock.push({ user_id: uid, badge_id: badge.id });
       if ((badge.points_value ?? 0) > 0) pointsToAward.push(badge.points_value);
     }
   }
 
   if (toUnlock.length === 0) {
-    return NextResponse.json({ unlocked: 0 });
+    return NextResponse.json({ unlocked: 0, stats });
   }
 
   await supabase.from('user_badges').insert(toUnlock);
@@ -87,7 +94,7 @@ export async function POST(request: Request) {
   if (pointsToAward.length > 0) {
     const total = pointsToAward.reduce((a, b) => a + b, 0);
     await supabase.from('points_transactions').insert({
-      user_id:     userId,
+      user_id:     uid,
       points:      total,
       reason:      `Badge${toUnlock.length > 1 ? 's' : ''} earned`,
       source_type: 'badge',
@@ -99,11 +106,11 @@ export async function POST(request: Request) {
     .map((b: any) => b.name);
 
   await supabase.from('notifications').insert({
-    user_id: userId,
+    user_id: uid,
     title:   `🎖️ Badge${toUnlock.length > 1 ? 's' : ''} unlocked!`,
     body:    badgeNames.join(', '),
     type:    'badge',
   });
 
-  return NextResponse.json({ unlocked: toUnlock.length, badges: badgeNames });
+  return NextResponse.json({ unlocked: toUnlock.length, badges: badgeNames, stats });
 }
